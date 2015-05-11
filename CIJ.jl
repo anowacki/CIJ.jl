@@ -2,9 +2,16 @@ module CIJ
 # Module containing routines for dealing with elastic constants
 
 export
+	Au,
 	C2S,
+	HillG,
+	HillK,
 	Panning_VTI,
+	ReussG,
+	ReussK,
 	VRH,
+	VoigtG,
+	VoigtK,
 	cij,
 	cijkl,
 	global_VTI,
@@ -255,6 +262,48 @@ function VRH(VF1, C1, rh1, VF2, C2, rh2)
 	voigt = (C1.*VF1 + C2.*VF2)/(VF1 + VF2)
 	reuss = (C2S(C1).*VF1 + C2S(C2).*VF2)/(VF1 + VF2)
 	return ((voigt + S2C(reuss))/2., (rh1*VF1 + rh2*VF2)/(VF1 + VF2))
+end
+
+function VoigtK(C)
+    # Return the Voigt bound on a crystal's K modulus.
+	# See: Hill, R., The elastic behaviour of a crystalline aggregate,
+	#	   P Phys Soc Lond A (1952) vol. 65 (389) pp. 349-355
+	(C[1,1] + C[2,2] + C[3,3] + 2.*(C[1,2] + C[2,3] + C[1,3]))/9.
+end
+
+function VoigtG(C)
+    # Return the Voigt bound on a crystal's G modulus
+	(C[1,1] + C[2,2] + C[3,3] - (C[1,2] + C[2,3] + C[1,3]) +
+		3.*(C[4,4] + C[5,5] + C[6,6]))/15.
+end
+
+function ReussK(C)
+    # Return the Reuss bound on a crystal's K modulus
+	S = C2S(C)
+	1./(S[1,1] + S[2,2] + S[3,3] + 2.*(S[1,2] + S[2,3] + S[1,3]))
+end
+
+function ReussG(C)
+    # Return the Reuss bound on a crystal's G modulus
+	S = C2S(C)
+	15./(4.*(S[1,1] + S[2,2] + S[3,3]) - 4.*(S[1,2] + S[2,3] + S[1,3]) +
+		3.*(S[4,4] + S[5,5] + S[6,6]))
+end
+
+function HillK(C)
+	(VoigtK(C) + ReussK(C))/2.
+end
+
+function HillG(C)
+    (VoigtG(C) + ReussG(C))/2.
+end
+
+function Au(C)
+    # Return the Universal Elastic Anisotropy Index.
+	# See: Ranganathan & Ostoja-Starzewksi, Universal elastic anisotropy index,
+	# Phys Rev Lett (2008) vol. 101 (5) pp. 055504
+	Kv, Gv, Kr, Gr = VoigtK(C), VoigtG(C), ReussK(C), ReussG(C)
+	5.*(Gv/Gr) + Kv/Kr - 6.
 end
 
 function rotmatA(a)
