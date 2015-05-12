@@ -400,12 +400,12 @@ function symm(C)
 	# symmetry.
 	c = zeros(6,6)
 	for i = 1:6
-		for j = i+1:6
+		for j = i:6
 			c[i,j] = C[i,j]
-			c[j,i] = C[i,j]
+			if i != j; c[j,i] = C[i,j]; end
 		end
 	end
-	return C
+	return c
 end
 
 function is_symm(C)
