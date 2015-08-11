@@ -16,11 +16,39 @@ export
 	cijkl,
 	global_VTI,
 	is_stable,
+	iso,
 	phase_vels,
 	pitl,
 	rot3,
 	thom,
 	thom_st
+
+function iso(;vp=nothing, vs=nothing, lam=nothing, mu=nothing, K=nothing, G=nothing)
+	# Return an isotropic Voigt stiffness matrix from a pair of the following:
+	#	vp, vs : Isotropic velocities in m/s
+	#	lam, mu: Lamé parameters divided by density in m^2/s^2
+	#	K, G   : Bulk and shear moduli dvided by density in m^2/s^2
+	C = zeros(6,6)
+	if vp != nothing && vs != nothing
+		C[1,1] = vp^2
+		C[4,4] = vs^2
+		C[1,2] = C[1,1] - 2C[4,4]
+	elseif lam != nothing && mu != nothing
+		C[1,1] = lam + 2mu
+		C[4,4] = mu
+		C[1,2] = lam
+	elseif K != nothing && G != nothing
+		C[1,1] = K + 4G/3.
+		C[4,4] = G
+		C[1,2] = C[1,1] - 2C[4,4]
+	else
+		error("iso: Must request a pair of vp,vs; lam,mu; K,G")
+	end
+	C[2,2] = C[3,3] = C[1,1]
+	C[5,5] = C[6,6] = C[4,4]
+	C[1,3] = C[2,3] = C[3,1] = C[3,2] = C[2,1] = C[1,2]
+	return C
+end
 
 function cijkl(C)
 	# Convert the 6x6 Voigt matrix into the 3x3x3x3 tensor
@@ -61,13 +89,13 @@ function thom(vp, vs, eps, gam, del)
 	elseif vs < 0.
 		error("CIJ.thom: vs must be greater than or equal to 0")
 	end
-	
+
 	C = zeros(6,6)
 	C[3,3] = vp^2
 	C[1,1] = C[2,2] = C[3,3]*(2.*eps + 1.)
 	C[4,4] = C[5,5] = vs^2
 	C[6,6] = C[4,4]*(2.*gam + 1.)
-	
+
 	b = 2.*C[4,4]
 	term = C[3,3] - C[4,4]
 	c = C[4,4]^2 - (2.*del*C[3,3]*term + term^2)
@@ -89,7 +117,7 @@ function thom_st(vp, vs, eps, gam ,delst)
 	elseif vs < 0.
 		error("CIJ.thom: vs must be greater than or equal to 0")
 	end
-	
+
 	C = zeros(6,6)
 	C[3,3] = vp^2
 	C[1,1] = C[2,2] = C[3,3]*(2.*eps + 1.)
@@ -105,7 +133,7 @@ function thom_st(vp, vs, eps, gam ,delst)
 	C[1,2] = C[2,1] = C[1,1] - 2.*C[6,6]
 	return C
 end
-	
+
 function global_VTI(vp, vs, xi, phi, eta)
 	# Return a 6x6 Voigt matrix defined by the radial anisotropy parameters
 	# as used typically in global seismology
@@ -116,10 +144,10 @@ function global_VTI(vp, vs, xi, phi, eta)
 	elseif xi <= 0. || phi <= 0. || eta <= 0.
 		error("CIJ.global_VTI: xi, phi and eta must be greater then 0")
 	end
-	
+
 	L = 15.*((3.*phi + 8. + 4.*eta)*vs^2 - (phi + 1. - 2.*eta)*vp^2) /
 		((6. + 4.*eta + 5.*xi)*(3.*phi + 8. +4.*eta) - 8.*(phi + 1. -2.*eta)*(1. - eta))
-	A = (15.*vp^2 - 8.*(1. - eta)*L) / (3.*phi + 8. + 4.*eta)	
+	A = (15.*vp^2 - 8.*(1. - eta)*L) / (3.*phi + 8. + 4.*eta)
 	F = eta*(A - 2.*L)
 	C = phi*A
 	N = xi*L
@@ -184,7 +212,7 @@ function phase_vels(C, az, inc)
 	#	C(6,6)  : Elasticity matrix
 	#	az      : Azimiuth (degrees) away from x1 towards -x2 axis
 	#	inc     : Inclination (degrees) away from x1-x2 plane towards x3 axis
-	
+
 	x = incaz2cart(inc, az)
 	# Create the Christoffel matrix
 	T = make_T(C, x)
@@ -379,7 +407,7 @@ function is_stable(C)
 		warn("CIJ.is_stable: Matrix is not symmetrical: Using upper half only")
 	end
 	# Positive definite matrices have a Cholesky decomposition
-	try 
+	try
 		chol(C)
 	catch PosDefException
 		return false
