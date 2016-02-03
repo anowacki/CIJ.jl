@@ -236,6 +236,44 @@ function phase_vels(C, az, inc)
 	return (vp, vs1, vs2, pol, avs)
 end
 
+function group_vels(C, az, inc)
+	# Return the group velocities in the az, inc direction for a 6x6
+	# Voigt elasticity matrix C, in an elastic medium.
+	# INPUT:
+	#	C(6,6)  : Elasticity matrix
+	#	az      : Azimuth (degrees) away from x1 towards -x2 axis
+	#	inc     : Inclination (degrees) away from x1-x2 plane towards x3
+
+	x = incaz2cart(inc, az)
+	# Create the Christoffel matrix
+	T = make_T(C, x)
+	# Find eigenvectors, giving phase velocities
+	eval, evec = eig(T)
+	ip = indmax(eval)
+	is2 = indmin(eval)
+	is1 = 6 - ip - is2
+	vp = sqrt(eval[ip])
+	vs1 = sqrt(eval[is1])
+	vs2 = sqrt(eval[is2])
+	xp = vec(evec[:,ip])
+	xs1 = vec(evec[:,is1])
+	xs2 = vec(evec[:,is2])
+	# Calculate group velocities, which are phase velocities projected onto
+	# group velocity directions
+	pp = xp/vp
+	ps1 = xs1/vs1
+	ps2 = xs2/vs2
+	p = [pp'; ps1'; ps2']
+	vg = zeros(3)
+	const ijkl = [1 6 5; 6 2 4; 5 4 3]
+	for i=1:3, j=1:3, k=1:3, l=1:3
+		m = ijkl[i,j]
+		n = ijkl[k,l]
+		vg[i] = vg[i] + C[m,n]*p[i,k]*x[j]*x[l]
+	end
+	return vg[1], vg[2], vg[3]
+end
+
 function get_pol(inc, az, x, xs1)
 	# Projection of fast shear wave polarisation onto wavefront plane
 	xs1p = cross(x, cross(x, xs1))
@@ -396,6 +434,16 @@ end
 
 # Copy of C2S for clarity when converting between C and S
 S2C = C2S
+
+function is_iso(C)
+	# Return true if C is isotropic
+	is_stable(C) || error("CIJ.is_iso: Not a valid elasticity matrix")
+	all(abs((diag(C[2:3,2:3]) - C[1,1])) .< eps()) &&
+		all(abs(diag(C[5:6,5:6]) - C[4,4]) .< eps()) &&
+		all(abs([C[1,2] C[1,3] C[2,3]] - (C[1,1] - 2C[4,4])) .< eps()) &&
+		return true
+	return false
+end
 
 function is_stable(C)
 	# Return false if the input 6x6 matrix is not positive definite (symmetric)
