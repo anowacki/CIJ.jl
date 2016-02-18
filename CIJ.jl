@@ -205,6 +205,19 @@ function pitl(d1, vp1, vs1, rho1, d2, vp2, vs2, rho2)
 	return (C, rho)
 end
 
+"""
+`phase_vels(C, az, inc) -> vp, vs1, vs2, pol, avs`
+
+Calculate the phase velocities for the 6x6 elasticity matrix `C` along the direction
+(`az`, `inc`), in degrees, and return P-wave velocity `vp`, the fast and slow shear
+wave velocities, `vs1` and `vs2`, the polarisation of the fast shear wave `pol`,
+and the shear wave velocity anisotropy, `avs`.  Velocities are in m/s if the tensor
+`C` is in m^2/s^2 (i.e., is a density-normalised tensor, sometimes called A).
+
+`az` is the azimuth in degrees measured from the x1 towards to -x2 axis.
+
+`inc` is the inclination in degrees from the x1-x2 plane towards the x3 axis.
+"""
 function phase_vels(C, az, inc)
 	# Return the phase velocities in the az, inc direction for a 6x6
 	# Voigt elasticity matrix C.
