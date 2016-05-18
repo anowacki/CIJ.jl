@@ -1,8 +1,5 @@
-"""
-    module CIJ
-
-CIJ contains routines for dealing with elastic constants.
-"""
+# Copyright Andy Nowacki 2015-, all rights reserverd.
+# See the file LICENSE.md for licence details.
 module CIJ
 
 import Base.write
