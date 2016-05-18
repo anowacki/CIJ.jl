@@ -1,5 +1,11 @@
+"""
+`module CIJ`
+
+CIJ contains routines for dealing with elastic constants.
+"""
 module CIJ
-# Module containing routines for dealing with elastic constants
+
+import Base.write
 
 export
 	Au,
@@ -20,14 +26,24 @@ export
 	phase_vels,
 	pitl,
 	rot3,
+    symm,
+    symm!,
+    tandon_and_weng,
 	thom,
 	thom_st
 
+"""
+`iso(;vp=nothing, vs=nothing, lam=nothing, mu=nothing, K=nothing, G=nothing) -> C`
+
+Return an isotropic Voigt stiffness matrix `C` from a pair of the following:
+
+`vp`, `vs` : Isotropic velocities in m/s
+
+`lam`, `mu`: Lamé parameters divided by density in m^2/s^2
+
+`K`, `G`   : Bulk and shear moduli dvided by density in m^2/s^2
+"""
 function iso(;vp=nothing, vs=nothing, lam=nothing, mu=nothing, K=nothing, G=nothing)
-	# Return an isotropic Voigt stiffness matrix from a pair of the following:
-	#	vp, vs : Isotropic velocities in m/s
-	#	lam, mu: Lamé parameters divided by density in m^2/s^2
-	#	K, G   : Bulk and shear moduli dvided by density in m^2/s^2
 	C = zeros(6,6)
 	if vp != nothing && vs != nothing
 		C[1,1] = vp^2
@@ -50,23 +66,31 @@ function iso(;vp=nothing, vs=nothing, lam=nothing, mu=nothing, K=nothing, G=noth
 	return C
 end
 
+"""
+`cijkl(C) -> c`
+
+Convert the 6x6 Voigt matrix `C` into the 3x3x3x3 tensor `c`
+"""
 function cijkl(C)
-	# Convert the 6x6 Voigt matrix into the 3x3x3x3 tensor
 	const a = [1 6 5
 	           6 2 4
 			   5 4 3]
 	if ! is_6x6(C)
 		error("CIJ.cijkl: Input must be a 6x6 array")
 	end
-	c = zeros(3,3,3,3)
+	c = Array{eltype(C)}(3, 3, 3, 3)
 	for i = 1:3, j = 1:3, k = 1:3, l = 1:3
 		c[i,j,k,l] = C[a[i,j],a[k,l]]
 	end
 	return c
 end
 
+"""
+`cij(c) -> C`
+
+Convert the 3x3x3x3 elasticity tensor `c` into the 6x6 Voigt matrix `C`
+"""
 function cij(c)
-	# Convert the 3x3x3x3 elasticity tensor into the 6x6 Voigt matrix
 	const a = [1 6 5
 	           6 2 4
 			   5 4 3]
@@ -80,10 +104,15 @@ function cij(c)
 	return C
 end
 
+"""
+`thom(vp, vs, eps, gam, del) -> C`
+
+Return the 6x6 Voigt matrix defined `C` by the weak anisotropy parameters of
+Thomsen (1986) Weak elastic anisotropy.  Geophysics, 51, 10, 1954-1966.
+
+Output is density-normalised tensor.
+"""
 function thom(vp, vs, eps, gam, del)
-	# Return a 6x6 Voigt matrix defined by the weak anisotropy parameters of
-	# Thomsen (1986) Weak elastic anisotropy.  Geophysics, 51, 10, 1954-1966.
-	# Output is density-normalised tensor.
 	if vp <= 0.
 		error("CIJ.thom: vp must be greater than 0")
 	elseif vs < 0.
@@ -108,10 +137,15 @@ function thom(vp, vs, eps, gam, del)
 	return C
 end
 
-function thom_st(vp, vs, eps, gam ,delst)
-	# Return a 6x6 Voigt matrix defined by the general anisotropy parameters of
-	# Thomsen (1986)
-	# Output has same units as input
+"""
+`thom_st(vp, vs, eps, gam, delst) -> C`
+
+Return the 6x6 Voigt matrix `C` defined by the general anisotropy parameters of
+Thomsen (1986).
+
+Output has same units as input.
+"""
+function thom_st(vp, vs, eps, gam, delst)
 	if vp <= 0.
 		error("CIJ.thom: vp must be greater than 0")
 	elseif vs < 0.
@@ -134,9 +168,13 @@ function thom_st(vp, vs, eps, gam ,delst)
 	return C
 end
 
+"""
+`global_VTI(vp, vs, xi, phi, eta) -> C`
+
+Return the 6x6 Voigt matrix `C` defined by the radial anisotropy parameters
+as used typically in global seismology.
+"""
 function global_VTI(vp, vs, xi, phi, eta)
-	# Return a 6x6 Voigt matrix defined by the radial anisotropy parameters
-	# as used typically in global seismology
 	if vp <= 0.
 		error("CIJ.global_VTI: vp must be greater than 0")
 	elseif vs < 0.
@@ -160,6 +198,12 @@ function global_VTI(vp, vs, xi, phi, eta)
 			 0.  0. 0. 0. 0. N]
 end
 
+"""
+`global_VTI(vp, vs, xi, phi, eta) -> C`
+
+Return the 6x6 Voigt matrix `C` defined by the radial anisotropy parameters
+defined by Panning and Romanowicz as an approximation to general VTI.
+"""
 function Panning_VTI(vp, vs, xi, phi)
 	L = 3.*vs^2/(2. + xi)
 	N = xi*L
@@ -175,9 +219,23 @@ function Panning_VTI(vp, vs, xi, phi)
 			 0.  0. 0. 0. 0. N]
 end
 
+"""
+`pitl(d1, vp1, vs1, rho1, d2, vp2, vs2, rho2) -> C, rho`
+
+Return the effective 6x6 Voigt matrix `C` and density `rho` for a medium defined
+by two periodic layers where each layer `i` is defined by:
+
+`di`:   The proportion of the total medium
+
+`vpi`:  P-wave velocity (m/s)
+
+`vsi`:  S-wave velocity (m/s)
+
+`rhoi`: Density (kg/m^3)
+
+`C` is density-normalised.
+"""
 function pitl(d1, vp1, vs1, rho1, d2, vp2, vs2, rho2)
-	# Return a tuple containing C and rho for a periodic, isotropic thin-layered
-	# medium
 	C = zeros(6,6)
 	# Lamé parameters from velocities
 	m1 = rho1*vs1^2
@@ -203,6 +261,125 @@ function pitl(d1, vp1, vs1, rho1, d2, vp2, vs2, rho2)
 	rho = (d1*rho1 + d2*rho2)/(d1 + d2)
     C /= rho
 	return (C, rho)
+end
+
+"""
+`tandon_and_weng(vp, vs, rho, del, c, vpi, vsi, rhoi) -> C, rho`
+
+Return the effective elastic constants `C` and density `rho` of a medium with matrix
+velocities `vp` and `vs` (m/s) and density `rho` (kg/m^3), and inclusion
+velocities `vpi` and `vsi`, density `rhoi`.
+
+`del` is the aspect ration of spheroidal inclusions: <1 oblate, >1 prolate
+
+`c` is the volume fraction of inclusions (0 <= c <= 1).
+"""
+function tandon_and_weng(vp, vs, rho, del, c, vpi, vsi, rhoi)
+    #This implementation is based on the Fortran code by Mike Kendall
+    del > 0 || error("CIJ.tandon_and_weng: `del` must be > 0.")
+    del == 1 && error("CIJ.tandon_and_weng: Theory not valid for `del == 1`")
+    0 <= c <= 1 || error("CIJ.tandon_and_weng: `c` must be in range 0 - 1")
+    vp == vpi && vs == vsi && rho == rhoi && return CIJ.iso(vp=vp, vs=vs), rho
+
+    C = zeros(6,6)
+    #  weighted average density
+    rho_out = (1.0 - c)*rho + c*rhoi
+
+    amu  = vs^2*rho
+    amui = vsi^2*rhoi
+    alam = vp^2*rho - 2.0*amu
+    alami = vpi^2*rhoi - 2.0*amui
+    bmi = alami + amui*2.0/3.0
+    bmps = alam + amu
+    #  Young's modulus for matrix
+    E0 = amu*(3.0*alam + 2.0*amu)/(alam + amu)
+    #  Poisson's ratio of the matrix.
+    anu = alam/(2.0*(alam + amu))
+
+    #  Some time saving terms
+    t1 = del^2 - 1.0
+    t2 = 1.0 - anu
+    t3 = 1.0 - 2.0*anu
+    t4 = 3.0 * del^2
+    t5 = 1.0 - del^2
+
+    # D1, D2 and D3 from Tandon and Weng (1984) (just before equation (18)).
+    D1 = 1.0 + 2.0*(amui - amu)/(alami - alam)
+    D2 = (alam + 2.0*amu)/(alami - alam)
+    D3 = alam/(alami - alam)
+
+    # g and g' terms (appendix of Tandon and Weng 1984). g is for prolate spheroidal
+    # inclusions (del>1), whilst g' is for disc-like (oblate) inclusions (del<1).
+    if (del >= 1) then
+        acshdel = log(del + sqrt(t1))
+        g = (del*sqrt(t1) - acshdel)*del/sqrt(t1^3)
+    else
+        # g' below
+        g = (acos(del) - del*sqrt(t5))*del/sqrt(t5^3) ;
+    end
+
+    # Eshelby's Sijkl tensor (appendix of Tandon and Weng 1984).
+    s11 = (t3 + (t4-1.0)/t1 - (t3 + t4/t1)*g)/(2.0*t2)
+    s22 = (t4/(t1*2.0) + (t3 - 9.0/(4.0*t1))*g)/(4.0*t2)
+    s33 = s22
+    s23 = (del^2/(2.0*t1) - (t3 + 3.0/(4.0*t1))*g)/(4.0*t2)
+    s32 = s23
+    s21 = (-2.0*del*del/t1 + (t4/t1 - t3)*g)/(4.0*t2)
+    s31 = s21
+    s12 = (-1.0*(t3 + 1.0/t1) + (t3 + 3.0/(2.0*t1))*g)/(2.0*t2)
+    s13 = s12
+    s44 = (del*del/(2.0*t1) + (t3 - 3.0/(4.0*t1))*g)/(4.0*t2)
+    s66 = (t3 - (t1+2.0)/t1 - (t3 - 3.0*(t1+2.0)/t1)*g/2.0)/(4.0*t2)
+    s55 = s66
+
+    # Tandon and Weng's B terms (after equation 17).
+    B1 = c*D1 + D2 + (1.0-c)*(D1*s11 + 2.0*s21)
+    B2 = c + D3 + (1.0-c)*(D1*s12 + s22 + s23)
+    B3 = c + D3 + (1.0-c)*(s11 + (1.0+D1)*s21)
+    B4 = c*D1 + D2 + (1.0-c)*(s12 + D1*s22 + s23)
+    B5 = c + D3 + (1.0-c)*(s12 + s22 + D1*s23)
+
+    # Tandon and Weng's A terms (after equation 20).
+    A1 = D1*(B4 + B5) - 2.0*B2
+    A2 = (1.0 + D1)*B2 - (B4 + B5)
+    A3 = B1 - D1*B3
+    A4 = (1.0 + D1)*B1 - 2.0*B3
+    A5 = (1.0 - D1)/(B4 - B5)
+    A = 2.0*B2*B3 - B1*(B4+B5)
+
+    # Tandon and Weng (1984) equations (25) (28) (31) (32)
+    E11 = E0/(1.0+c*(A1+2.0*anu*A2)/A)
+    E22 = E0/(1.0+c*(-2.0*anu*A3 + (1.0-anu)*A4 + (1.0+anu)*A5*A)/(2.0*A))
+    amu12 = amu*(1.0 + c/(amu/(amui-amu) + 2.0*(1.0-c)*s66))
+    amu23 = amu*(1.0 + c/(amu/(amui-amu) + 2.0*(1.0-c)*s44))
+
+    # Sayers equation (36)
+    anu31 = anu - c*(anu*(A1+2.0*anu*A2)+(A3-anu*A4)) / (A + c*(A1+2.0*anu*A2))
+
+    # T&W equation (36)
+    #     aK12 term; bmps=plane strain bulk modulus
+    anum = (1.0+anu)*(1.0-2.0*anu)
+    denom = 1.0 - anu*(1.0+2.0*anu31) + c*(2.0*(anu31-anu)*A3 + (1.0-anu*(1.0+2.0*anu31))*A4)/A
+    aK23 = bmps*anum/denom
+    anu12tst = E11/E22 - (1.0/amu23 + 1.0/aK23)*E11/4.0
+
+    # Cij - Sayers' (1992) equations (24)-(29).
+    # Conversion
+    C[2,2] = amu23 + aK23
+    C[3,3] = C[2,2]
+    C[1,1] = E11 + 4.0*anu12tst*aK23
+    C[2,3] = -amu23 + aK23
+    C[1,2] = 2.0*anu31*aK23
+    C[1,3] = C[1,2]
+    C[5,5] = amu12
+    C[6,6] = C[5,5]
+    C[4,4] = (C[2,2] - C[2,3])/2.0
+
+    # Fill out matrix by symmetry
+    CIJ.symm!(C)
+
+    # apply density normalisation
+    C/rho_out, rho_out
 end
 
 """
@@ -343,6 +520,37 @@ function VRH(VF1, C1, rh1, VF2, C2, rh2)
 	return ((voigt + S2C(reuss))/2., (rh1*VF1 + rh2*VF2)/(VF1 + VF2))
 end
 
+@doc doc"""
+`VRH(VF, C, rho) -> C, rho`
+
+Return the Voigt-Reus-Hill-averaged 6x6 Voigt stiffness matrix `C` and density `rho`
+from combining n sets of elastic constants and densities, whose proportions are
+listed in `VF`, where n is the number of constants and length of `VF` and `rho`.
+
+`VF`: A vector (which need not sum to 1) containing the relative proportions of each
+set of elastic constants, size n
+
+`C`: A nx6x6 array of elastic constants
+
+`rho`: A vector of densities of length n.
+""" ->
+function VRH(VF, C, rho)
+    size(VF) == size(C,1) == size(rho) || error("CIJ.VRH: Arrays are not the same lengths")
+    size(C)[2:3] == (6,6) || error("CIJ.VRH: C must have size (n,6,6)")
+    VF = VF./sum(VF)
+    voigt = zero(C)
+    reuss = zero(C)
+    Cave = zeros(6, 6)
+    for k in 1:length(VF)
+        voigt += VF[k]*reshape(C[k,:,:], 6, 6)
+        reuss += VF[k]*C2S(reshape(C[k,:,:], 6, 6))
+    end
+    reuss = S2C(reuss)
+    Cave = (voigt + reuss)/2
+    rhave = VF.*rho
+    Cave, rhave
+end
+
 function VoigtK(C)
     # Return the Voigt bound on a crystal's K modulus.
 	# See: Hill, R., The elastic behaviour of a crystalline aggregate,
@@ -440,16 +648,26 @@ function transform(C, M)
 	return K * (C * transpose(K))
 end
 
-function C2S(C)
-	# Return the inverse of a 6x6 matrix
-	inv(C)
-end
+"""
+`C2S(C) -> S`
 
-# Copy of C2S for clarity when converting between C and S
+Return the inverse of the stiffness matrix `C`, the compliance matrix `S`.
+"""
+C2S(C) = inv(C)
+
+"""
+`S2C(S) -> C`
+
+Return the inverse of the compliance matrix `S`, the stiffness matrix `C`.
+"""
 S2C = C2S
 
+"""
+`is_iso(C) -> ::Bool`
+
+Return `true` if `C` is isotropic.
+"""
 function is_iso(C)
-	# Return true if C is isotropic
 	is_stable(C) || error("CIJ.is_iso: Not a valid elasticity matrix")
 	all(abs((diag(C[2:3,2:3]) - C[1,1])) .< eps()) &&
 		all(abs(diag(C[5:6,5:6]) - C[4,4]) .< eps()) &&
@@ -458,9 +676,13 @@ function is_iso(C)
 	return false
 end
 
+"""
+`is_stable(C) -> ::Bool`
+
+Return `false` if the input 6x6 matrix `C` is not positive definite (symmetric)
+and hence not dynamically stable.
+"""
 function is_stable(C)
-	# Return false if the input 6x6 matrix is not positive definite (symmetric)
-	# and hence not dynamically stable.
 	if ! is_6x6(C)
 		error("CIJ.is_stable: Matrix must be 6x6")
 	end
@@ -476,43 +698,135 @@ function is_stable(C)
 	return true
 end
 
-# Return the normalised elastic constants for olivine, handy for testing purposes
+"""
+`ol() -> C, rho`
+
+Return the normalised elastic constants `C` and density `rho` for olivine,
+handy for testing purposes
+"""
 ol() = [320.5  68.1  71.6   0.0   0.0   0.0;
          68.1 196.5  76.8   0.0   0.0   0.0;
 		 71.6  76.8 233.5   0.0   0.0   0.0;
 		  0.0   0.0   0.0  64.0   0.0   0.0;
 		  0.0   0.0   0.0   0.0  77.0   0.0;
-		  0.0   0.0   0.0   0.0   0.0  78.7]*1.e9/3355.
+		  0.0   0.0   0.0   0.0   0.0  78.7]*1.e9/3355., 3355.
 
+
+"""
+`read(file) -> C, rho`
+
+Return the elasticity matrix `C` and density `rho` from the ecs-format file
+`file` (which usually has the extension `.ecs`).  This should be in the format:
+
+    1 1 C11
+    . . ...
+    i j Cij
+    . . ...
+    6 6 C66
+    7 7 rho
+
+Comments are permitted at any point, preceded by a '#' character.
+
+In this version of the code, all elastic constants must be specified, even if
+they are 0.
+"""
+function read(file::AbstractString)
+    isfile(file) || error("CIJ.read: File \"$file\" does not exist.")
+    d = readdlm(file)
+    size(d, 1) == 22 || error("CIJ.read: File \"$file\" is not in expected format")
+    C = zeros(6,6)
+    rho = 0
+    for l in 1:22
+        i = Int(d[l,1])
+        j = Int(d[l,2])
+        if i == j == 7
+            rho = d[l,3]
+        else
+            1 <= i <= j <= 6 || error("CIJ.read: Unexpected indices '$i' and '$j' in file \"$file\"")
+            C[i,j] = d[l,3]
+            C[j,i] = d[l,3]
+        end
+    end
+    C, rho
+end
+
+"""
+`write(C, rho, file, comment="")`
+
+Write the density-normalised elastic constants `C` and density `rho` to the file
+`file` in the following format:
+
+    1 1 C11
+    . . ...
+    i j Cij
+    . . ...
+    6 6 C66
+    7 7 rho
+
+If supplied, `comment` should be a string of one or more lines to write at the
+end of the file to describe the constants.  By default, the following is written:
+
+    # Saved by <user> on <hostname> on <date> using <Julia version>
+
+Such files usually have a `.ecs` file extension.
+"""
+function write{T<:Number}(C::Array{T,2}, rho::Number, file::AbstractString, comment::AbstractString="")
+    is_6x6(C) && is_stable(C) && is_symm(C) ||
+        error("CIJ.save: Elastic constants are not in the right form.  "
+              * "May be asymmetric, unstable or not a 6x6 matrix")
+    isdir(dirname(file)) || error("CIJ.save: Directory \"$(dirname(file))\" does not exist")
+    f = open(file, "w")
+    for i = 1:6, j=i:6
+        @printf(f, "%d %d %12.6e\n", i, j, C[i,j]*rho)
+    end
+    @printf(f, "7 7 %9.3f\n", rho)
+    if comment != ""
+        if comment[1] == '#' comment = "# " * comment end
+        write(f, replace(chomp(comment), "\n", "\n# ") * "\n")
+    end
+    user = ENV["USER"]
+    hostname = readchomp(`hostname`)
+    write(f, "# Saved by user $user on $hostname on $(now()) using Julia $VERSION\n")
+    close(f)
+end
+
+"""
+`symm(C) -> C`
+
+Return a copy of C with the upper half copied into the lower half to enforce symmetry.
+"""
 function symm(C)
-	# Return a copy of C, but with the upper half copied into the lower to enforce
-	# symmetry.
-	c = zeros(6,6)
-	for i = 1:6
-		for j = i:6
-			c[i,j] = C[i,j]
-			if i != j; c[j,i] = C[i,j]; end
-		end
-	end
+	c = copy(C)
+	CIJ.symm!(c)
 	return c
 end
 
+"""
+`symm!(C)`
+
+Fill in the lower half of 6x6 matrix `C` with the upper half, making it symmetrical.
+"""
+symm!(C) = for i = 1:6, j = i+1:6 C[j,i] = C[i,j] end
+
+"""
+`is_symm(C) -> ::Bool`
+
+Return `true` if `C` is symmetrical.
+"""
 function is_symm(C)
 	# Return true if C is symmetrical
-	for i = 1:6
-		for j = i:6
-			if C[i,j] != C[j,i]
-				return false
-			end
-		end
+	for i = 1:6, j = i+1:6
+		if C[i,j] != C[j,i] return false end
 	end
 	return true
 end
 
-function is_6x6(C)
-	# Return true is C is a 6x6 matrix
-	return size(C) == (6,6)
-end
+"""
+`is_6x6(C) -> ::Bool`
+
+Return `true` if C is a 6x6 matrix.
+"""
+is_6x6(C) = size(C) == (6,6)
 
 function modulo(a, b)
 	# Replicate the Fortran modulo function, where the result is always
