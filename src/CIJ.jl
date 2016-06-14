@@ -265,7 +265,7 @@ end
 
 Return the effective elastic constants `C` and density `rho` of a medium with matrix
 velocities `vp` and `vs` (m/s) and density `rho` (kg/m^3), and inclusion
-velocities `vpi` and `vsi`, density `rhoi`.
+velocities `vpi` and `vsi`, density `rhoi`.  The symmetry axis is parallel to x1.
 
 `del` is the aspect ration of spheroidal inclusions: <1 oblate, >1 prolate
 
