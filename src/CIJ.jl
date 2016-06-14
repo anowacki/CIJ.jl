@@ -156,7 +156,7 @@ function thom_st(vp, vs, eps, gam, delst)
     C[6,6] = C[4,4]*(2.*gam + 1.)
     a = 2.
     b = 4.*C[4,4]
-    c = C[4,4]^2 - 2.delst*C[3,3]^2 - (C[3,3] - C[4,4])*(C[1,1] + C[3,3] - 2.*C[4,4])
+    c = C[4,4]^2 - 2.*delst*C[3,3]^2 - (C[3,3] - C[4,4])*(C[1,1] + C[3,3] - 2.*C[4,4])
     if b^2 - 4.*a*c < 0.
         error("CIJ.thom_st: S velocity too high or delta too negative")
     end
