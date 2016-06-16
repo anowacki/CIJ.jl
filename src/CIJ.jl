@@ -2,6 +2,8 @@
 # See the file LICENSE.md for licence details.
 module CIJ
 
+__precompile__()
+
 import Base.write
 
 export
