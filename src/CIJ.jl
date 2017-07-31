@@ -9,17 +9,22 @@ import Base.write
 export
     Au,
     C2S,
+    C2S!,
     HillG,
     HillK,
     Panning_VTI,
     ReussG,
     ReussK,
+    S2C,
+    S2C!,
     VRH,
     VoigtG,
     VoigtK,
     cij,
     cijkl,
     global_VTI,
+    grechka_cracks,
+    grechka_cracks!,
     is_stable,
     iso,
     phase_vels,
@@ -97,7 +102,7 @@ function cij(c)
         error("CIJ.cij: Input must be a 3x3x3x3 tensor")
     end
     C = zeros(6,6)
-    for i = 1:3, j = 1:3, k = 1:3, l = 1:3
+    for i = 1:3, j = i:3, k = 1:3, l = k:3
         C[a[i,j],a[k,l]] = c[i,j,k,l]
     end
     return C
@@ -382,6 +387,55 @@ function tandon_and_weng(vp, vs, rho, del, c, vpi, vsi, rhoi)
 end
 
 """
+    grechka_cracks!(C, ξ, ϕ=0) -> C
+
+Add dry cracks using the theory of Grechka (2007) [1] to a tensor `C` which has VTI symmetry
+about the 3-axis.  Cracks have fracture density `ξ` and strike `ϕ`°, measured from the
+1-axis towards the negative 2-axis.  `C` is updated in-place.
+
+    grechka_cracks(C, ξ, ϕ=0) -> C′
+
+Copying version of `grechka_cracks!`.
+
+Both forms take `ξ` and `ϕ` as both scalars and `AbstractArray`s.  In the latter case,
+multiple fracture sets are added, and are assumed to be non-interacting.  This is valid for
+'small' ξ only.
+
+N.B.: No check is made on the input constants `C`.
+
+#### References
+
+1. Vladimir Grechka (2007). Multiple cracks in VTI rocks: Effective properties and fracture
+   characterization.  Geophysics, 72, D81–D91.  doi:10.1190/1.2751500
+"""
+function grechka_cracks!(C, ξ, ϕ=zero(eltype(C)))
+    C .= CIJ.rot3(C, 0, 0, -ϕ)
+    # Excess normal and tangential compliances of crack
+    Bn = 4/3*ξ*C[2,2]/C[6,6]/(C[2,2] - C[6,6])
+    Bth = 16/3*ξ*C[2,2]/C[6,6]/(3C[2,2] - 2C[6,6])
+    Btv = 16/3*ξ*C[3,3]/C[5,5]/(3C[3,3] - 2C[5,5])
+    # Update compliance after Eschelby (1957)
+    S = C2S!(C)
+    S[2,2] += Bn
+    S[4,4] += Btv
+    S[6,6] += Bth
+    C .= CIJ.rot3(S2C!(S), 0, 0, ϕ)
+end
+grechka_cracks(C, ξ, ϕ=zero(eltype(C))) = grechka_cracks!(deepcopy(C), ξ, ϕ)
+
+function grechka_cracks!(C, ξ::AbstractArray, ϕ::AbstractArray=zeros(ξ, eltype(C)))
+    length(ξ) == length(ϕ) || throw(ArgumentError("Lengths of ξ and ϕ must be the same"))
+    for i in 1:length(ξ)
+        grechka_cracks!(C, ξ[i], ϕ[i])
+    end
+    C
+end
+grechka_cracks(C, ξ::AbstractVector, ϕ::AbstractVector=zeros(ξ, eltype(C))) =
+    grechka_cracks!(deepcopy(C), ξ, ϕ)
+
+@doc (@doc grechka_cracks!) grechka_cracks
+
+"""
     phase_vels(C, az, inc) -> vp, vs1, vs2, pol, avs
 
 Calculate the phase velocities for the 6x6 elasticity matrix `C` along the direction
@@ -654,13 +708,27 @@ Return a rotated tensor `Cr`, the result of rotating in turn the tensor `C`:
 Rotations are performed in that order,
 """
 function rot3(C, a, b, c)
-    # Rotate a 6x6 array in turn by the x1, x2 and x3 axes by a, b and c degrees
     R = *(rotmatC(c), *(rotmatB(b), rotmatA(a)))
     return transform(C, R)
 end
 
+"""
+    transform(C, M) -> C′
+
+Apply a transformation matrix `M` to a 6x6 matrix `C`, returning the transformed matrix `C′`.
+"""
 function transform(C, M)
-    # Apply a transformation matrix M to a 6x6 matrix C
+    K = _transformation_matrix(M)
+    return K * (C * transpose(K))
+end
+
+"""
+    _transformation_matrix(M) -> K
+
+Return the matrix `K` which represents the matrix with which to transform a Voigt
+6x6 matrix by the 3x3 transformation matrix `M`.
+"""
+function _transformation_matrix(M)
     K = zeros(6, 6)
     for i = 1:3
         i1 = (i + 1)%3
@@ -678,7 +746,7 @@ function transform(C, M)
             K[i+3,j+3] = M[i1,j1]*M[i2,j2] + M[i1,j2]*M[i2,j1]
         end
     end
-    return K * (C * transpose(K))
+    K
 end
 
 """
@@ -693,7 +761,21 @@ C2S(C) = inv(C)
 
 Return the inverse of the compliance matrix `S`, the stiffness matrix `C`.
 """
-S2C = C2S
+S2C(S) = C2S(S)
+
+"""
+    C2S!(C) -> S
+
+Invert the stiffness matrix `C` in place, giving the compliance matrix `S`.
+"""
+C2S!(C) = LinAlg.inv!(lufact!(C))
+
+"""
+    S2C!(S) -> C
+
+Invert the compliance matrix `S` in place, giving the siffness matrix `C`.
+"""
+S2C!(S) = C2S!(S)
 
 """
     is_iso(C) -> ::Bool
@@ -804,9 +886,10 @@ end of the file to describe the constants.  By default, the following is written
 Such files usually have a `.ecs` file extension.
 """
 function write{T<:Number}(C::Array{T,2}, rho::Number, file::AbstractString, comment::AbstractString="")
-    is_6x6(C) && is_stable(C) && is_symm(C) ||
-        error("CIJ.save: Elastic constants are not in the right form.  "
-              * "May be asymmetric, unstable or not a 6x6 matrix")
+    is_6x6(C) || throw(ArgumentError("Elastic constants must be a 6x6 matrix"))
+    is_stable(C) && is_symm(C) ||
+        warn("CIJ.write: Elastic constants are not in the right form.  "
+              * "May be asymmetric or unstable.")
     isdir(dirname(file)) || error("CIJ.save: Directory \"$(dirname(file))\" does not exist")
     f = open(file, "w")
     for i = 1:6, j=i:6
@@ -847,7 +930,6 @@ symm!(C) = for i = 1:6, j = i+1:6 C[j,i] = C[i,j] end
 Return `true` if `C` is symmetrical.
 """
 function is_symm(C)
-    # Return true if C is symmetrical
     for i = 1:6, j = i+1:6
         if C[i,j] != C[j,i] return false end
     end
