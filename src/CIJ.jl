@@ -1,8 +1,8 @@
 # Copyright Andy Nowacki 2015-, all rights reserverd.
 # See the file LICENSE.md for licence details.
-module CIJ
-
 __precompile__()
+
+module CIJ
 
 import Base.write
 
@@ -444,9 +444,13 @@ wave velocities, `vs1` and `vs2`, the polarisation of the fast shear wave `pol`,
 and the shear wave velocity anisotropy, `avs`.  Velocities are in m/s if the tensor
 `C` is in m^2/s^2 (i.e., is a density-normalised tensor, sometimes called A).
 
-`az` is the azimuth in degrees measured from the x1 towards to -x2 axis.
+`az` is the azimuth in degrees measured from the x1 towards the -x2 axis.
 
 `inc` is the inclination in degrees from the x1-x2 plane towards the x3 axis.
+
+`pol` is measured when looking towards the (0,0,0) point along the ray (in
+the negative propagation direction).  `pol` increases clockwise away from the vector
+normal to the propagation direction which points towards to the x3-axis.
 """
 function phase_vels(C, az, inc)
     x = incaz2cart(inc, az)
