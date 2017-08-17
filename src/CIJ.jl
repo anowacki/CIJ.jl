@@ -314,7 +314,7 @@ function tandon_and_weng(vp, vs, rho, del, c, vpi, vsi, rhoi)
 
     # g and g' terms (appendix of Tandon and Weng 1984). g is for prolate spheroidal
     # inclusions (del>1), whilst g' is for disc-like (oblate) inclusions (del<1).
-    if (del >= 1) then
+    if (del >= 1)
         acshdel = log(del + sqrt(t1))
         g = (del*sqrt(t1) - acshdel)*del/sqrt(t1^3)
     else
@@ -384,6 +384,50 @@ function tandon_and_weng(vp, vs, rho, del, c, vpi, vsi, rhoi)
 
     # apply density normalisation
     C/rho_out, rho_out
+end
+
+"""
+    hudson(vp, vs, rho, del, ϵ, vpi, vsi, rhoi) -> C, rho_bulk
+
+Return the effective elastic constants `C` and density `rho_bulk` of a medium with
+matrix isotropic velocities `vp` and `vs`, and density `rho`, and inclusion
+velocities `vpi` and `vsi`, and density `rhoi`, where the crack density is `ϵ`
+and the aspect ratio of ellipsoidal inclusions is `del`.
+
+The theory is valid when `ϵ` ≪ 1, where `ϵ` is given by ``N a^2/\nu`` and ``N`` is
+the number of cracks of radius ``a`` in a volume ``\nu``.
+
+The formulation is according to Hudson (1982), as given in Crampin (1984).
+"""
+function hudson(vp, vs, rho, del, ϵ, vpi, vsi, rhoi)
+    error("`hudson` has not been tested yet")
+    ϵ > 0.1 && warn("Theory of Hudson (1982) only valid for `ϵ` < 0.1, but using ϵ = $ϵ")
+    λ, μ, κ = lame(vp, vs, rho)
+    λ′, μ′, κ′ = lame(vpi, vsi, rhoi)
+    K = (κ′ + 4/3*μ′)/(π*del*μ) * (λ + 2μ)/(λ + μ)
+    M = 4μ′/(π*del*μ) * (λ + 2μ)/(3λ + 4μ)
+    U₁ = 4/3*(λ + 2μ)/(λ + μ)/(1 + K)
+    U₃ = 16/3*(λ + 2μ)/(3λ + 4μ)/(1 + M)
+    q = 15*(λ/μ)^2 + 28*(λ/μ) + 28
+    X = 2μ*(3λ + 8μ)/(λ + 2μ)
+    c⁰ = iso(lam=λ, mu=μ)
+    # First-order correction from Hudson (1981)
+    c¹ = -ϵ/μ*[ (λ + 2μ)^2*U₁  λ*(λ + 2μ)*U₁  λ*(λ + 2μ)*U₁ 0    0      0
+                λ*(λ + 2μ)*U₁     λ^2*U₁         λ^2*U₁     0    0      0
+                λ*(λ + 2μ)*U₁     λ^2*U₁         λ^2*U₁     0    0      0
+                      0             0              0        0    0      0
+                      0             0              0        0  μ^2*U₃   0
+                      0             0              0        0    0    μ^2*U₃]
+    # Second-order correction from Hudson (1982)
+    c² = ϵ^2/15*[ (λ + 2μ)*q*U₁^2       λ*q*U₁^2             λ*q*U₁^2       0   0      0
+                     λ*q*U₁^2     λ^2*q/(λ + 2μ)*U₁^2  λ^2*q/(λ + 2μ)*U₁^2  0   0      0
+                     λ*q*U₁^2     λ^2*q/(λ + 2μ)*U₁^2  λ^2*q/(λ + 2μ)*U₁^2  0   0      0
+                        0                  0                    0           0   0      0
+                        0                  0                    0           0 X*U₃^2   0
+                        0                  0                    0           0   0    X*U₃^2]
+    c = c⁰ .+ c¹ .+ c²
+    rho_bulk = (1 - ϵ)*rho + ϵ*rhoi
+    c./rho_bulk, rho_bulk
 end
 
 """
@@ -935,7 +979,7 @@ Return `true` if `C` is symmetrical.
 """
 function is_symm(C)
     for i = 1:6, j = i+1:6
-        if C[i,j] != C[j,i] return false end
+        if !isapprox(C[i,j], C[j,i]) return false end
     end
     return true
 end
@@ -955,6 +999,19 @@ function modulo(a, b)
         m += b
     end
     return m
+end
+
+"""
+    lame(vp, vs, ρ) -> λ, μ, κ
+
+Return the Lamé parameters `λ`, `μ` and `κ` from the velocities `vp` and `vs`
+and density `ρ`.
+"""
+function lame(vp, vs, ρ)
+    μ = ρ*vs^2
+    λ = ρ*(vp^2 - 2vs^2)
+    κ = ρ*vp^2 - 4/3*μ
+    λ, μ, κ
 end
 
 end # module CIJ
