@@ -6,6 +6,11 @@ module CIJ
 
 import Base.write
 
+if VERSION > v"0.7-"
+    import Printf.@printf
+    import Dates.now
+end
+
 export
     Au,
     C2S,
@@ -36,6 +41,11 @@ export
     thom,
     thom_st
 
+"Lookup index matrix to convert between elasticity tensor and Voigt matrix"
+const VOIGT_CONTRACTION_MATRIX = [1 6 5
+                                  6 2 4
+                                  5 4 3]
+
 """
     iso(;vp=nothing, vs=nothing, lam=nothing, mu=nothing, K=nothing, G=nothing) -> C
 
@@ -58,7 +68,7 @@ function iso(;vp=nothing, vs=nothing, lam=nothing, mu=nothing, K=nothing, G=noth
         C[4,4] = mu
         C[1,2] = lam
     elseif K != nothing && G != nothing
-        C[1,1] = K + 4G/3.
+        C[1,1] = K + 4G/3
         C[4,4] = G
         C[1,2] = C[1,1] - 2C[4,4]
     else
@@ -76,9 +86,7 @@ end
 Convert the 6x6 Voigt matrix `C` into the 3x3x3x3 tensor `c`
 """
 function cijkl(C)
-    const a = [1 6 5
-               6 2 4
-               5 4 3]
+    a = VOIGT_CONTRACTION_MATRIX
     if ! is_6x6(C)
         error("CIJ.cijkl: Input must be a 6x6 array")
     end
@@ -95,9 +103,7 @@ end
 Convert the 3x3x3x3 elasticity tensor `c` into the 6x6 Voigt matrix `C`
 """
 function cij(c)
-    const a = [1 6 5
-               6 2 4
-               5 4 3]
+    a = VOIGT_CONTRACTION_MATRIX
     if size(c) != (3,3,3,3)
         error("CIJ.cij: Input must be a 3x3x3x3 tensor")
     end
@@ -117,27 +123,27 @@ Thomsen (1986) Weak elastic anisotropy.  Geophysics, 51, 10, 1954-1966.
 Output is density-normalised tensor.
 """
 function thom(vp, vs, eps, gam, del)
-    if vp <= 0.
+    if vp <= 0
         error("CIJ.thom: vp must be greater than 0")
-    elseif vs < 0.
+    elseif vs < 0
         error("CIJ.thom: vs must be greater than or equal to 0")
     end
 
     C = zeros(6,6)
     C[3,3] = vp^2
-    C[1,1] = C[2,2] = C[3,3]*(2.*eps + 1.)
+    C[1,1] = C[2,2] = C[3,3]*(2*eps + 1)
     C[4,4] = C[5,5] = vs^2
-    C[6,6] = C[4,4]*(2.*gam + 1.)
+    C[6,6] = C[4,4]*(2*gam + 1)
 
-    b = 2.*C[4,4]
+    b = 2C[4,4]
     term = C[3,3] - C[4,4]
-    c = C[4,4]^2 - (2.*del*C[3,3]*term + term^2)
-    d = b^2 - 4.*c
-    if (d < 0.)
+    c = C[4,4]^2 - (2*del*C[3,3]*term + term^2)
+    d = b^2 - 4*c
+    if (d < 0)
         error("CIJ.thom: S-velocity too high or delta too negative")
     end
-    C[1,3] = C[2,3] = C[3,1] = C[3,2] = -b/2. + sqrt(d)/2.
-    C[1,2] = C[2,1] = C[1,1] - 2.*C[6,6]
+    C[1,3] = C[2,3] = C[3,1] = C[3,2] = -b/2 + sqrt(d)/2
+    C[1,2] = C[2,1] = C[1,1] - 2*C[6,6]
     return C
 end
 
@@ -150,25 +156,25 @@ Thomsen (1986).
 Output has same units as input.
 """
 function thom_st(vp, vs, eps, gam, delst)
-    if vp <= 0.
+    if vp <= 0
         error("CIJ.thom: vp must be greater than 0")
-    elseif vs < 0.
+    elseif vs < 0
         error("CIJ.thom: vs must be greater than or equal to 0")
     end
 
     C = zeros(6,6)
     C[3,3] = vp^2
-    C[1,1] = C[2,2] = C[3,3]*(2.*eps + 1.)
+    C[1,1] = C[2,2] = C[3,3]*(2*eps + 1)
     C[4,4] = C[5,5] = vs^2
-    C[6,6] = C[4,4]*(2.*gam + 1.)
-    a = 2.
-    b = 4.*C[4,4]
-    c = C[4,4]^2 - 2.*delst*C[3,3]^2 - (C[3,3] - C[4,4])*(C[1,1] + C[3,3] - 2.*C[4,4])
-    if b^2 - 4.*a*c < 0.
+    C[6,6] = C[4,4]*(2*gam + 1)
+    a = 2.0
+    b = 4*C[4,4]
+    c = C[4,4]^2 - 2*delst*C[3,3]^2 - (C[3,3] - C[4,4])*(C[1,1] + C[3,3] - 2*C[4,4])
+    if b^2 - 4*a*c < 0
         error("CIJ.thom_st: S velocity too high or delta too negative")
     end
-    C[1,3] = C[3,1] = C[2,3] = C[3,2] = (-b + sqrt(b^2 - 4.*a*c))/(2.*a)
-    C[1,2] = C[2,1] = C[1,1] - 2.*C[6,6]
+    C[1,3] = C[3,1] = C[2,3] = C[3,2] = (-b + sqrt(b^2 - 4*a*c))/(2*a)
+    C[1,2] = C[2,1] = C[1,1] - 2C[6,6]
     return C
 end
 
@@ -179,27 +185,27 @@ Return the 6x6 Voigt matrix `C` defined by the radial anisotropy parameters
 as used typically in global seismology.
 """
 function global_VTI(vp, vs, xi, phi, eta)
-    if vp <= 0.
+    if vp <= 0
         error("CIJ.global_VTI: vp must be greater than 0")
-    elseif vs < 0.
+    elseif vs < 0
         error("CIJ.global_VTI: vs must be greater than or equal to 0")
-    elseif xi <= 0. || phi <= 0. || eta <= 0.
+    elseif xi <= 0 || phi <= 0 || eta <= 0
         error("CIJ.global_VTI: xi, phi and eta must be greater then 0")
     end
 
-    L = 15.*((3.*phi + 8. + 4.*eta)*vs^2 - (phi + 1. - 2.*eta)*vp^2) /
-        ((6. + 4.*eta + 5.*xi)*(3.*phi + 8. +4.*eta) - 8.*(phi + 1. -2.*eta)*(1. - eta))
-    A = (15.*vp^2 - 8.*(1. - eta)*L) / (3.*phi + 8. + 4.*eta)
-    F = eta*(A - 2.*L)
+    L = 15*((3*phi + 8 + 4*eta)*vs^2 - (phi + 1 - 2*eta)*vp^2) /
+        ((6 + 4*eta + 5*xi)*(3*phi + 8 +4*eta) - 8*(phi + 1 -2*eta)*(1 - eta))
+    A = (15*vp^2 - 8*(1 - eta)*L) / (3*phi + 8 + 4*eta)
+    F = eta*(A - 2L)
     C = phi*A
     N = xi*L
-    C12 = A - 2.*N
-    return [ A  C12 F  0. 0. 0.
-            C12  A  F  0. 0. 0.
-             F   F  C  0. 0. 0.
-             0.  0. 0. L  0. 0.
-             0.  0. 0. 0. L  0.
-             0.  0. 0. 0. 0. N]
+    C12 = A - 2N
+    return [ A  C12 F  0  0  0
+            C12  A  F  0  0  0
+             F   F  C  0  0  0
+             0   0  0  L  0  0
+             0   0  0  0  L  0
+             0   0  0  0  0  N]
 end
 
 """
@@ -209,18 +215,18 @@ Return the 6x6 Voigt matrix `C` defined by the radial anisotropy parameters
 defined by Panning and Romanowicz as an approximation to general VTI.
 """
 function Panning_VTI(vp, vs, xi, phi)
-    L = 3.*vs^2/(2. + xi)
+    L = 3*vs^2/(2 + xi)
     N = xi*L
-    A = 5.*vp^2/(4. + phi)
+    A = 5*vp^2/(4 + phi)
     C = phi*A
-    F = A - 2.*L
-    C12 = A - 2.*N
-    return [ A  C12 F  0. 0. 0.
-            C12  A  F  0. 0. 0.
-             F   F  C  0. 0. 0.
-             0.  0. 0. L  0. 0.
-             0.  0. 0. 0. L  0.
-             0.  0. 0. 0. 0. N]
+    F = A - 2*L
+    C12 = A - 2*N
+    return [ A  C12 F  0  0  0
+            C12  A  F  0  0  0
+             F   F  C  0  0  0
+             0   0  0  L  0  0
+             0   0  0  0  L  0
+             0   0  0  0  0  N]
 end
 
 """
@@ -244,17 +250,17 @@ function pitl(d1, vp1, vs1, rho1, d2, vp2, vs2, rho2)
     # Lamé parameters from velocities
     m1 = rho1*vs1^2
     m2 = rho2*vs2^2
-    l1 = rho1*vp1^2 - 2.*m1
-    l2 = rho2*vp2^2 - 2.*m2
+    l1 = rho1*vp1^2 - 2m1
+    l2 = rho2*vp2^2 - 2m2
     # Time-saving terms
-    l1p2m1 = l1 + 2.*m1
-    l2p2m2 = l2 + 2.*m2
+    l1p2m1 = l1 + 2*m1
+    l2p2m2 = l2 + 2*m2
     # D term, p. 785
     D = (d1 + d2)*(d1*l2p2m2 + d2*l1p2m1)
     # Eq. (7)
-    C[1,1] = ((d1+d2)^2*l1p2m1*l2p2m2 + 4.*d1*d2*(m1 - m2)*((l1 + m1) - (l2 + m2)))/D
+    C[1,1] = ((d1+d2)^2*l1p2m1*l2p2m2 + 4*d1*d2*(m1 - m2)*((l1 + m1) - (l2 + m2)))/D
     C[2,2] = C[1,1]
-    C[1,2] = C[2,1] = ((d1 + d2)^2*l1*l2 + 2.*(l1*d1 + l2*d2)*(m2*d1 + m1*d2))/D
+    C[1,2] = C[2,1] = ((d1 + d2)^2*l1*l2 + 2*(l1*d1 + l2*d2)*(m2*d1 + m1*d2))/D
     C[1,3] = ((d1 + d2)*(l1*d1*l2p2m2 + l2*d2*l1p2m1))/D
     C[3,1] = C[2,3] = C[1,3]
     C[3,2] = C[2,3]
@@ -287,29 +293,29 @@ function tandon_and_weng(vp, vs, rho, del, c, vpi, vsi, rhoi)
 
     C = zeros(6,6)
     #  weighted average density
-    rho_out = (1.0 - c)*rho + c*rhoi
+    rho_out = (1 - c)*rho + c*rhoi
 
     amu  = vs^2*rho
     amui = vsi^2*rhoi
-    alam = vp^2*rho - 2.0*amu
-    alami = vpi^2*rhoi - 2.0*amui
-    bmi = alami + amui*2.0/3.0
+    alam = vp^2*rho - 2*amu
+    alami = vpi^2*rhoi - 2*amui
+    bmi = alami + amui*2/3
     bmps = alam + amu
     #  Young's modulus for matrix
-    E0 = amu*(3.0*alam + 2.0*amu)/(alam + amu)
+    E0 = amu*(3*alam + 2*amu)/(alam + amu)
     #  Poisson's ratio of the matrix.
-    anu = alam/(2.0*(alam + amu))
+    anu = alam/(2*(alam + amu))
 
     #  Some time saving terms
-    t1 = del^2 - 1.0
-    t2 = 1.0 - anu
-    t3 = 1.0 - 2.0*anu
-    t4 = 3.0 * del^2
-    t5 = 1.0 - del^2
+    t1 = del^2 - 1
+    t2 = 1 - anu
+    t3 = 1 - 2*anu
+    t4 = 3 * del^2
+    t5 = 1 - del^2
 
     # D1, D2 and D3 from Tandon and Weng (1984) (just before equation (18)).
-    D1 = 1.0 + 2.0*(amui - amu)/(alami - alam)
-    D2 = (alam + 2.0*amu)/(alami - alam)
+    D1 = 1 + 2*(amui - amu)/(alami - alam)
+    D2 = (alam + 2*amu)/(alami - alam)
     D3 = alam/(alami - alam)
 
     # g and g' terms (appendix of Tandon and Weng 1984). g is for prolate spheroidal
@@ -323,61 +329,61 @@ function tandon_and_weng(vp, vs, rho, del, c, vpi, vsi, rhoi)
     end
 
     # Eshelby's Sijkl tensor (appendix of Tandon and Weng 1984).
-    s11 = (t3 + (t4-1.0)/t1 - (t3 + t4/t1)*g)/(2.0*t2)
-    s22 = (t4/(t1*2.0) + (t3 - 9.0/(4.0*t1))*g)/(4.0*t2)
+    s11 = (t3 + (t4-1)/t1 - (t3 + t4/t1)*g)/(2*t2)
+    s22 = (t4/(t1*2) + (t3 - 9/(4*t1))*g)/(4*t2)
     s33 = s22
-    s23 = (del^2/(2.0*t1) - (t3 + 3.0/(4.0*t1))*g)/(4.0*t2)
+    s23 = (del^2/(2*t1) - (t3 + 3/(4*t1))*g)/(4*t2)
     s32 = s23
-    s21 = (-2.0*del*del/t1 + (t4/t1 - t3)*g)/(4.0*t2)
+    s21 = (-2*del*del/t1 + (t4/t1 - t3)*g)/(4*t2)
     s31 = s21
-    s12 = (-1.0*(t3 + 1.0/t1) + (t3 + 3.0/(2.0*t1))*g)/(2.0*t2)
+    s12 = (-(t3 + 1/t1) + (t3 + 3/(2*t1))*g)/(2*t2)
     s13 = s12
-    s44 = (del*del/(2.0*t1) + (t3 - 3.0/(4.0*t1))*g)/(4.0*t2)
-    s66 = (t3 - (t1+2.0)/t1 - (t3 - 3.0*(t1+2.0)/t1)*g/2.0)/(4.0*t2)
+    s44 = (del*del/(2*t1) + (t3 - 3/(4*t1))*g)/(4*t2)
+    s66 = (t3 - (t1+2)/t1 - (t3 - 3*(t1+2)/t1)*g/2)/(4*t2)
     s55 = s66
 
     # Tandon and Weng's B terms (after equation 17).
-    B1 = c*D1 + D2 + (1.0-c)*(D1*s11 + 2.0*s21)
-    B2 = c + D3 + (1.0-c)*(D1*s12 + s22 + s23)
-    B3 = c + D3 + (1.0-c)*(s11 + (1.0+D1)*s21)
-    B4 = c*D1 + D2 + (1.0-c)*(s12 + D1*s22 + s23)
-    B5 = c + D3 + (1.0-c)*(s12 + s22 + D1*s23)
+    B1 = c*D1 + D2 + (1-c)*(D1*s11 + 2*s21)
+    B2 = c + D3 + (1-c)*(D1*s12 + s22 + s23)
+    B3 = c + D3 + (1-c)*(s11 + (1+D1)*s21)
+    B4 = c*D1 + D2 + (1-c)*(s12 + D1*s22 + s23)
+    B5 = c + D3 + (1-c)*(s12 + s22 + D1*s23)
 
     # Tandon and Weng's A terms (after equation 20).
-    A1 = D1*(B4 + B5) - 2.0*B2
-    A2 = (1.0 + D1)*B2 - (B4 + B5)
+    A1 = D1*(B4 + B5) - 2*B2
+    A2 = (1 + D1)*B2 - (B4 + B5)
     A3 = B1 - D1*B3
-    A4 = (1.0 + D1)*B1 - 2.0*B3
-    A5 = (1.0 - D1)/(B4 - B5)
-    A = 2.0*B2*B3 - B1*(B4+B5)
+    A4 = (1 + D1)*B1 - 2*B3
+    A5 = (1 - D1)/(B4 - B5)
+    A = 2*B2*B3 - B1*(B4+B5)
 
     # Tandon and Weng (1984) equations (25) (28) (31) (32)
-    E11 = E0/(1.0+c*(A1+2.0*anu*A2)/A)
-    E22 = E0/(1.0+c*(-2.0*anu*A3 + (1.0-anu)*A4 + (1.0+anu)*A5*A)/(2.0*A))
-    amu12 = amu*(1.0 + c/(amu/(amui-amu) + 2.0*(1.0-c)*s66))
-    amu23 = amu*(1.0 + c/(amu/(amui-amu) + 2.0*(1.0-c)*s44))
+    E11 = E0/(1+c*(A1+2*anu*A2)/A)
+    E22 = E0/(1+c*(-2*anu*A3 + (1-anu)*A4 + (1+anu)*A5*A)/(2*A))
+    amu12 = amu*(1 + c/(amu/(amui-amu) + 2*(1-c)*s66))
+    amu23 = amu*(1 + c/(amu/(amui-amu) + 2*(1-c)*s44))
 
     # Sayers equation (36)
-    anu31 = anu - c*(anu*(A1+2.0*anu*A2)+(A3-anu*A4)) / (A + c*(A1+2.0*anu*A2))
+    anu31 = anu - c*(anu*(A1+2*anu*A2)+(A3-anu*A4)) / (A + c*(A1+2*anu*A2))
 
     # T&W equation (36)
     #     aK12 term; bmps=plane strain bulk modulus
-    anum = (1.0+anu)*(1.0-2.0*anu)
-    denom = 1.0 - anu*(1.0+2.0*anu31) + c*(2.0*(anu31-anu)*A3 + (1.0-anu*(1.0+2.0*anu31))*A4)/A
+    anum = (1 + anu)*(1 - 2*anu)
+    denom = 1 - anu*(1+2*anu31) + c*(2*(anu31-anu)*A3 + (1-anu*(1+2*anu31))*A4)/A
     aK23 = bmps*anum/denom
-    anu12tst = E11/E22 - (1.0/amu23 + 1.0/aK23)*E11/4.0
+    anu12tst = E11/E22 - (1/amu23 + 1/aK23)*E11/4
 
     # Cij - Sayers' (1992) equations (24)-(29).
     # Conversion
     C[2,2] = amu23 + aK23
     C[3,3] = C[2,2]
-    C[1,1] = E11 + 4.0*anu12tst*aK23
+    C[1,1] = E11 + 4*anu12tst*aK23
     C[2,3] = -amu23 + aK23
-    C[1,2] = 2.0*anu31*aK23
+    C[1,2] = 2*anu31*aK23
     C[1,3] = C[1,2]
     C[5,5] = amu12
     C[6,6] = C[5,5]
-    C[4,4] = (C[2,2] - C[2,3])/2.0
+    C[4,4] = (C[2,2] - C[2,3])/2
 
     # Fill out matrix by symmetry
     CIJ.symm!(C)
@@ -516,7 +522,7 @@ function phase_vels(C, az, inc)
     # xs2 = vec(evec[:,is2])
     # Calculate S1 polarisation and amount of shear wave anisotropy
     pol = get_pol(inc, az, vec(x), vec(xs1))
-    avs = 200.*(vs1 - vs2)/(vs1 + vs2)
+    avs = 200*(vs1 - vs2)/(vs1 + vs2)
     return (vp, vs1, vs2, pol, avs)
 end
 
@@ -549,7 +555,7 @@ function group_vels(C, az, inc)
     ps2 = xs2/vs2
     p = [pp'; ps1'; ps2']
     vg = zeros(3)
-    const ijkl = [1 6 5; 6 2 4; 5 4 3]
+    ijkl = VOIGT_CONTRACTION_MATRIX
     for i=1:3, j=1:3, k=1:3, l=1:3
         m = ijkl[i,j]
         n = ijkl[k,l]
@@ -569,11 +575,11 @@ function get_pol(inc, az, x, xs1)
     pol = rad2deg(atan2(norm(v), dot(xs1p, u)))
     # If v is codirectional with x, then the angle is correct; otherwise, we're
     # the wrong way round
-    if dot(x, v) < 0.
+    if dot(x, v) < 0
         pol = -pol
     end
     # Put in range -90° to 90°
-    return modulo(pol + 90., 180.) - 90.
+    return modulo(pol + 90.0, 180.0) - 90.0
 end
 
 function incaz2up(inc, az)
@@ -589,7 +595,7 @@ function make_T(C, x)
     #    C(6,6) : Voigt elasticity matrix
     #    x(3)   : Direction of interest
     T = zeros(3,3)
-    const ijkl = [1 6 5; 6 2 4; 5 4 3]
+    ijkl = VOIGT_CONTRACTION_MATRIX
     for i = 1:3, j = 1:3, k = 1:3, l = 1:3
         m = ijkl[i,j]
         n = ijkl[k,l]
@@ -611,7 +617,7 @@ function VRH(VF1, C1, rh1, VF2, C2, rh2)
     # Return the VRH elasticity and density
     voigt = (C1.*VF1 + C2.*VF2)/(VF1 + VF2)
     reuss = (C2S(C1).*VF1 + C2S(C2).*VF2)/(VF1 + VF2)
-    return ((voigt + S2C(reuss))/2., (rh1*VF1 + rh2*VF2)/(VF1 + VF2))
+    return ((voigt + S2C(reuss))/2, (rh1*VF1 + rh2*VF2)/(VF1 + VF2))
 end
 
 """
@@ -659,7 +665,7 @@ end
 
 Return the Voigt bound on a tensor `C`'s bulk modulus `K`.
 """
-VoigtK(C) = (C[1,1] + C[2,2] + C[3,3] + 2.*(C[1,2] + C[2,3] + C[1,3]))/9.
+VoigtK(C) = (C[1,1] + C[2,2] + C[3,3] + 2*(C[1,2] + C[2,3] + C[1,3]))/9
 
 """
     VoigtG(C) -> G
@@ -667,7 +673,7 @@ VoigtK(C) = (C[1,1] + C[2,2] + C[3,3] + 2.*(C[1,2] + C[2,3] + C[1,3]))/9.
 Return the Voigt bound on a tensor `C`'s shear modulus `G`.
 """
 VoigtG(C) = (C[1,1] + C[2,2] + C[3,3] - (C[1,2] + C[2,3] + C[1,3]) +
-             3.*(C[4,4] + C[5,5] + C[6,6]))/15.
+             3*(C[4,4] + C[5,5] + C[6,6]))/15
 
 """
     ReussK(C) -> K
@@ -676,7 +682,7 @@ Return the Reuss bound on a tensor `C`'s bulk modulus `K`.
 """
 function ReussK(C)
     S = C2S(C)
-    1./(S[1,1] + S[2,2] + S[3,3] + 2.*(S[1,2] + S[2,3] + S[1,3]))
+    1/(S[1,1] + S[2,2] + S[3,3] + 2*(S[1,2] + S[2,3] + S[1,3]))
 end
 
 """
@@ -686,8 +692,8 @@ Return the Reuss bound on a tensor `C`'s shear modulus `G`.
 """
 function ReussG(C)
     S = C2S(C)
-    15./(4.*(S[1,1] + S[2,2] + S[3,3]) - 4.*(S[1,2] + S[2,3] + S[1,3]) +
-        3.*(S[4,4] + S[5,5] + S[6,6]))
+    15/(4*(S[1,1] + S[2,2] + S[3,3]) - 4*(S[1,2] + S[2,3] + S[1,3]) +
+        3*(S[4,4] + S[5,5] + S[6,6]))
 end
 
 """
@@ -695,14 +701,14 @@ end
 
 Return the Voigt-Reuss-Hill bound on a tensor `C`'s bulk modulus `K`.
 """
-HillK(C) = (VoigtK(C) + ReussK(C))/2.
+HillK(C) = (VoigtK(C) + ReussK(C))/2
 
 """
     HillG(C) -> G
 
 Return the Voigt-Reuss-Hill bound on a tensor `C`'s shear modulus `G`.
 """
-HillG(C) = (VoigtG(C) + ReussG(C))/2.
+HillG(C) = (VoigtG(C) + ReussG(C))/2
 
 """
     Au(C) -> au
@@ -714,34 +720,34 @@ See: Ranganathan & Ostoja-Starzewksi, Universal elastic anisotropy index,
 """
 function Au(C)
     Kv, Gv, Kr, Gr = VoigtK(C), VoigtG(C), ReussK(C), ReussG(C)
-    5.*(Gv/Gr) + Kv/Kr - 6.
+    5*(Gv/Gr) + Kv/Kr - 6
 end
 
 function rotmatA(a)
     # Return a 3x3 array representing a rotation about the 1 axis by a degrees,
     # clockwise when looking down towards origin along axis.
     da = deg2rad(a)
-    return [1.       0.       0.;
-            0.  cos(da)  sin(da);
-            0. -sin(da)  cos(da)]
+    return [1     0        0
+            0  cos(da)  sin(da)
+            0 -sin(da)  cos(da)]
 end
 
 function rotmatB(b)
     # Return a 3x3 array representing a rotation about the 1 axis by a degrees,
     # clockwise when looking down towards origin along axis.
     db = deg2rad(b)
-    return [cos(db) 0. -sin(db);
-                 0. 1.       0.;
-            sin(db) 0.  cos(db)]
+    return [cos(db) 0 -sin(db)
+               0    1     0
+            sin(db) 0  cos(db)]
 end
 
 function rotmatC(c)
     # Return a 3x3 array representing a rotation about the 1 axis by a degrees,
     # clockwise when looking down towards origin along axis.
     dc = deg2rad(c)
-    return [ cos(dc) sin(dc) 0.;
-            -sin(dc) cos(dc) 0.;
-                  0.      0. 1.]
+    return [ cos(dc) sin(dc) 0
+            -sin(dc) cos(dc) 0
+                0       0    1]
 end
 
 """
@@ -789,7 +795,7 @@ function _transformation_matrix(M)
             j2 = (j + 2)%3
             j2 = j2 == 0 ? 3 : j2
             K[i,j] = M[i,j]^2
-            K[i,j+3] = 2.*M[i,j1]*M[i,j2]
+            K[i,j+3] = 2*M[i,j1]*M[i,j2]
             K[i+3,j] = M[i1,j]*M[i2,j]
             K[i+3,j+3] = M[i1,j1]*M[i2,j2] + M[i1,j2]*M[i2,j1]
         end
@@ -872,7 +878,7 @@ ol() = [320.5  68.1  71.6   0.0   0.0   0.0;
          71.6  76.8 233.5   0.0   0.0   0.0;
           0.0   0.0   0.0  64.0   0.0   0.0;
           0.0   0.0   0.0   0.0  77.0   0.0;
-          0.0   0.0   0.0   0.0   0.0  78.7]*1.e9/3355., 3355.
+          0.0   0.0   0.0   0.0   0.0  78.7]*1.e9/3355.0, 3355.0
 
 
 """
@@ -933,7 +939,7 @@ end of the file to describe the constants.  By default, the following is written
 
 Such files usually have a `.ecs` file extension.
 """
-function write{T<:Number}(C::Array{T,2}, rho::Number, file::AbstractString, comment::AbstractString="")
+function write(C::Array{<:Number,2}, rho::Number, file, comment::String="")
     is_6x6(C) || throw(ArgumentError("Elastic constants must be a 6x6 matrix"))
     is_stable(C) && is_symm(C) ||
         warn("CIJ.write: Elastic constants are not in the right form.  "
@@ -945,7 +951,7 @@ function write{T<:Number}(C::Array{T,2}, rho::Number, file::AbstractString, comm
     end
     @printf(f, "7 7 %9.3f\n", rho)
     if comment != ""
-        if comment[1] == '#' comment = "# " * comment end
+        if comment[1] != '#' comment = "# " * comment end
         write(f, replace(chomp(comment), "\n", "\n# ") * "\n")
     end
     user = ENV["USER"]
@@ -959,18 +965,20 @@ end
 
 Return a copy of C with the upper half copied into the lower half to enforce symmetry.
 """
-function symm(C)
-    c = copy(C)
-    CIJ.symm!(c)
-    return c
+symm(C) = symm!(deepcopy(C))
+
+"""
+    symm!(C) -> C
+
+Fill in the lower half of 6x6 matrix `C` with the upper half, making it symmetrical,
+and returning `C`.
+"""
+function symm!(C)
+    for i in 1:6, j in i+1:6
+        C[j,i] = C[i,j]
+    end
+    C
 end
-
-"""
-    symm!(C)
-
-Fill in the lower half of 6x6 matrix `C` with the upper half, making it symmetrical.
-"""
-symm!(C) = for i = 1:6, j = i+1:6 C[j,i] = C[i,j] end
 
 """
     is_symm(C) -> ::Bool
