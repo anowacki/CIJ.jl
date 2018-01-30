@@ -6,6 +6,9 @@ module CIJ
 
 import Base.write
 
+using StaticArrays
+using Rotations
+
 if VERSION > v"0.7-"
     import Printf.@printf
     import Dates.now
@@ -723,33 +726,6 @@ function Au(C)
     5*(Gv/Gr) + Kv/Kr - 6
 end
 
-function rotmatA(a)
-    # Return a 3x3 array representing a rotation about the 1 axis by a degrees,
-    # clockwise when looking down towards origin along axis.
-    da = deg2rad(a)
-    return [1     0        0
-            0  cos(da)  sin(da)
-            0 -sin(da)  cos(da)]
-end
-
-function rotmatB(b)
-    # Return a 3x3 array representing a rotation about the 1 axis by a degrees,
-    # clockwise when looking down towards origin along axis.
-    db = deg2rad(b)
-    return [cos(db) 0 -sin(db)
-               0    1     0
-            sin(db) 0  cos(db)]
-end
-
-function rotmatC(c)
-    # Return a 3x3 array representing a rotation about the 1 axis by a degrees,
-    # clockwise when looking down towards origin along axis.
-    dc = deg2rad(c)
-    return [ cos(dc) sin(dc) 0
-            -sin(dc) cos(dc) 0
-                0       0    1]
-end
-
 """
     rot3(C, a, b, x) -> Cr
 
@@ -761,10 +737,7 @@ Return a rotated tensor `Cr`, the result of rotating in turn the tensor `C`:
 
 Rotations are performed in that order,
 """
-function rot3(C, a, b, c)
-    R = *(rotmatC(c), *(rotmatB(b), rotmatA(a)))
-    return transform(C, R)
-end
+rot3(C, a, b, c) = transform(C, RotXYZ(deg2rad(a), deg2rad(b), deg2rad(c)))
 
 """
     transform(C, M) -> C′
@@ -782,9 +755,9 @@ end
 Return the matrix `K` which represents the matrix with which to transform a Voigt
 6x6 matrix by the 3x3 transformation matrix `M`.
 """
-function _transformation_matrix(M)
-    K = zeros(6, 6)
-    for i = 1:3
+@inline function _transformation_matrix(M)
+    K = MMatrix{6, 6, Float64}()
+    @inbounds for i = 1:3
         i1 = (i + 1)%3
         i1 = i1 == 0 ? 3 : i1
         i2 = (i + 2)%3
