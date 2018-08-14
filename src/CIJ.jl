@@ -1022,4 +1022,43 @@ function lame(vp, vs, ρ)
     λ, μ, κ
 end
 
+"""
+    vti(; vpv, vsv, vph, vsh, eta)
+
+Return a density-normalised elastic tensor for a VTI medium defined using the velocities
+Vpv, Vsv, Vph, Vsh and anisotropy parameter η.
+
+    vti(; A, C, L, N, F)
+
+Return an unnormalised elastic tensor for a VTI medium defined using Love's (1927) notation.
+
+The constants are symmetric about the 3-axis.
+
+### References
+
+- Love AEH (1927) A Treatise on the Mathematical Theory of Elasticity. New York: Dover Publications.
+"""
+function vti(; vpv=nothing, vsv=nothing, vph=nothing, vsh=nothing, eta=nothing,
+        A=nothing, C=nothing, L=nothing, N=nothing, F=nothing)
+    if all(x->x!==nothing, (vpv, vsv, vph, vsh, eta))
+        c = zeros(6,6)
+        c[1,1] = c[2,2] = vph^2
+        c[3,3] = vpv^2
+        c[4,4] = c[5,5] = vsv^2
+        c[6,6] = vsh^2
+        c[1,3] = c[2,3] = c[3,1] = c[3,2] = eta*(c[1,1] - 2c[4,4])
+        c[1,2] = c[2,1] = c[1,1] - 2c[6,6]
+        c
+    elseif all(x->x!==nothing, (A, C, L, N, F))
+        Float64[  A  A-2N  F   0   0   0
+                A-2N   A   F   0   0   0
+                  F    F   C   0   0   0
+                  0    0   0   L   0   0
+                  0    0   0   0   L   0
+                  0    0   0   0   0   N]
+    else
+        throw(ArgumentError("Insufficient parameters defined."))
+    end
+end
+
 end # module CIJ
