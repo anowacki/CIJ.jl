@@ -1,56 +1,124 @@
 # Copyright Andy Nowacki 2015-, all rights reserverd.
 # See the file LICENSE.md for licence details.
-__precompile__()
 
+"""
+# CIJ
+
+Deal with linear elastic constants, especially for geophysical applications.
+
+## 
+"""
 module CIJ
 
-import Base.write
+import Dates.now
+using LinearAlgebra: cross, dot, norm
+import Printf.@printf
 
 using StaticArrays
 using Rotations
 
-if VERSION > v"0.7-"
-    import Printf.@printf
-    import Dates.now
-end
 
 export
+    # Types and constructors
+    EC,
+    # Constructors of elastic constants
+    Panning_VTI,
+    global_VTI,
+    grechka_cracks,
+    grechka_cracks!,
+    iso,
+    pitl,
+    tandon_and_weng,
+    thom,
+    thom_st,
+    # Properties of a tensor
     Au,
     C2S,
     C2S!,
     HillG,
     HillK,
-    Panning_VTI,
     ReussG,
     ReussK,
-    S2C,
-    S2C!,
     VRH,
     VoigtG,
     VoigtK,
+    is_stable,
+    phase_vels,
+    # Conversion between representations
+    S2C,
+    S2C!,
     cij,
     cijkl,
-    global_VTI,
-    grechka_cracks,
-    grechka_cracks!,
-    is_stable,
-    iso,
-    phase_vels,
-    pitl,
+    # Operations
     rot3,
     symm,
-    symm!,
-    tandon_and_weng,
-    thom,
-    thom_st
+    symm!
 
 "Lookup index matrix to convert between elasticity tensor and Voigt matrix"
-const VOIGT_CONTRACTION_MATRIX = [1 6 5
-                                  6 2 4
-                                  5 4 3]
+const VOIGT_CONTRACTION_MATRIX = @SMatrix [1 6 5
+                                           6 2 4
+                                           5 4 3]
 
+"Default precision of floating point numbers used in `EC` type"
+const DEFAULT_FLOAT = Float64
+
+#=
+    Types
+=#
 """
-    iso(;vp=nothing, vs=nothing, lam=nothing, mu=nothing, K=nothing, G=nothing) -> C
+    EC{T} <: AbstractArray{T,2}
+
+Wrapper type for elastic constants held as a 6×6 Voigt matrix.  The underlying storage
+is a `StaticArrays.MArray`, meaning certain operations using this structure will be
+quicker than using normal `Array`s.  For instance, elastic constant transformations
+such as rotations, or conversion between stiffness and compliance, are each about
+twice as fast.
+
+    EC(data::AbstractArray{T}; warn=false) where T -> ec
+
+Create a set of elastic constants `ec` from the array `data` which must have length 36.
+Symmetry is enforced when converting, taking the upper half of the matrix.  No warning
+is issued for non-symmetric input, unless `warn` is `true`.
+"""
+struct EC{T} <: AbstractArray{T,2}
+    data::MArray{Tuple{6,6},T,2,36}
+
+    function EC{T}(data; warn=false) where T
+        ec = new{T}(MMatrix{6,6,T}(data))
+        if warn
+            atol = √eps(T)
+            for i in 1:6, j in i+1:6
+                if !isapprox(ec[i,j], ec[j,i], atol=atol)
+                    @warn("input matrix not symmetrical: taking upper half")
+                    break
+                end
+            end
+        end
+        for j in 1:6, i in j+1:6
+            ec[i,j] = ec[j,i]
+        end
+        ec
+    end
+end
+
+EC(x::AbstractArray{T}; kwargs...) where T = EC{float(T)}(MMatrix{6,6}(x); kwargs...)
+EC{T}(x::NTuple{36}; kwargs...) where T = EC{T}(MArray{Tuple{6,6}}(x); kwargs...)
+EC(x::NTuple{36,T}; kwargs...) where T = EC{DEFAULT_FLOAT}(MArray{Tuple{6,6},DEFAULT_FLOAT}(x); kwargs...)
+
+Base.size(x::EC) = (6,6)
+Base.length(x::EC) = 36
+Base.getindex(x::EC, i...) = x.data[i...]
+Base.setindex!(x::EC, val, i, j) = x.data[i,j] = x.data[j,i] = val
+Base.IndexStyle(::Type{EC}) = IndexStyle(MMatrix)
+
+Base.zero(::Type{EC{T}}) where T = EC{T}(zero(MMatrix{6,6,T}))
+Base.zero(::Type{EC}) = zero(EC{DEFAULT_FLOAT})
+
+#=
+    Functions
+=#
+"""
+    iso(; vp=nothing, vs=nothing, lam=nothing, mu=nothing, K=nothing, G=nothing) -> C
 
 Return an isotropic Voigt stiffness matrix `C` from a pair of the following:
 
@@ -60,26 +128,28 @@ Return an isotropic Voigt stiffness matrix `C` from a pair of the following:
 
 `K`, `G`   : Bulk and shear moduli dvided by density in m^2/s^2
 """
-function iso(;vp=nothing, vs=nothing, lam=nothing, mu=nothing, K=nothing, G=nothing)
-    C = zeros(6,6)
-    if vp != nothing && vs != nothing
-        C[1,1] = vp^2
-        C[4,4] = vs^2
-        C[1,2] = C[1,1] - 2C[4,4]
-    elseif lam != nothing && mu != nothing
-        C[1,1] = lam + 2mu
-        C[4,4] = mu
-        C[1,2] = lam
-    elseif K != nothing && G != nothing
-        C[1,1] = K + 4G/3
-        C[4,4] = G
-        C[1,2] = C[1,1] - 2C[4,4]
-    else
-        error("iso: Must request a pair of vp,vs; lam,mu; K,G")
+function iso(; vp=nothing, vs=nothing, lam=nothing, mu=nothing, K=nothing, G=nothing)
+    C = zero(EC)
+    @inbounds begin
+        if vp != nothing && vs != nothing
+            C[1,1] = vp^2
+            C[4,4] = vs^2
+            C[1,2] = C[1,1] - 2C[4,4]
+        elseif lam != nothing && mu != nothing
+            C[1,1] = lam + 2mu
+            C[4,4] = mu
+            C[1,2] = lam
+        elseif K != nothing && G != nothing
+            C[1,1] = K + 4G/3
+            C[4,4] = G
+            C[1,2] = C[1,1] - 2C[4,4]
+        else
+            error("iso: Must request a pair of vp,vs; lam,mu; K,G")
+        end
+        C[2,2] = C[3,3] = C[1,1]
+        C[5,5] = C[6,6] = C[4,4]
+        C[1,3] = C[2,3] = C[3,1] = C[3,2] = C[2,1] = C[1,2]
     end
-    C[2,2] = C[3,3] = C[1,1]
-    C[5,5] = C[6,6] = C[4,4]
-    C[1,3] = C[2,3] = C[3,1] = C[3,2] = C[2,1] = C[1,2]
     return C
 end
 
@@ -93,7 +163,7 @@ function cijkl(C)
     if ! is_6x6(C)
         error("CIJ.cijkl: Input must be a 6x6 array")
     end
-    c = Array{eltype(C)}(3, 3, 3, 3)
+    c = MArray{Tuple{3,3,3,3},eltype(C),4,81}(undef)
     for i = 1:3, j = 1:3, k = 1:3, l = 1:3
         c[i,j,k,l] = C[a[i,j],a[k,l]]
     end
@@ -110,7 +180,7 @@ function cij(c)
     if size(c) != (3,3,3,3)
         error("CIJ.cij: Input must be a 3x3x3x3 tensor")
     end
-    C = zeros(6,6)
+    C = zero(EC{float(eltype(c))})
     for i = 1:3, j = i:3, k = 1:3, l = k:3
         C[a[i,j],a[k,l]] = c[i,j,k,l]
     end
@@ -132,21 +202,23 @@ function thom(vp, vs, eps, gam, del)
         error("CIJ.thom: vs must be greater than or equal to 0")
     end
 
-    C = zeros(6,6)
-    C[3,3] = vp^2
-    C[1,1] = C[2,2] = C[3,3]*(2*eps + 1)
-    C[4,4] = C[5,5] = vs^2
-    C[6,6] = C[4,4]*(2*gam + 1)
+    C = zero(EC)
+    @inbounds begin
+        C[3,3] = vp^2
+        C[1,1] = C[2,2] = C[3,3]*(2*eps + 1)
+        C[4,4] = C[5,5] = vs^2
+        C[6,6] = C[4,4]*(2*gam + 1)
 
-    b = 2C[4,4]
-    term = C[3,3] - C[4,4]
-    c = C[4,4]^2 - (2*del*C[3,3]*term + term^2)
-    d = b^2 - 4*c
-    if (d < 0)
-        error("CIJ.thom: S-velocity too high or delta too negative")
+        b = 2C[4,4]
+        term = C[3,3] - C[4,4]
+        c = C[4,4]^2 - (2*del*C[3,3]*term + term^2)
+        d = b^2 - 4*c
+        if (d < 0)
+            error("CIJ.thom: S-velocity too high or delta too negative")
+        end
+        C[1,3] = C[2,3] = C[3,1] = C[3,2] = -b/2 + sqrt(d)/2
+        C[1,2] = C[2,1] = C[1,1] - 2*C[6,6]
     end
-    C[1,3] = C[2,3] = C[3,1] = C[3,2] = -b/2 + sqrt(d)/2
-    C[1,2] = C[2,1] = C[1,1] - 2*C[6,6]
     return C
 end
 
@@ -165,19 +237,21 @@ function thom_st(vp, vs, eps, gam, delst)
         error("CIJ.thom: vs must be greater than or equal to 0")
     end
 
-    C = zeros(6,6)
-    C[3,3] = vp^2
-    C[1,1] = C[2,2] = C[3,3]*(2*eps + 1)
-    C[4,4] = C[5,5] = vs^2
-    C[6,6] = C[4,4]*(2*gam + 1)
-    a = 2.0
-    b = 4*C[4,4]
-    c = C[4,4]^2 - 2*delst*C[3,3]^2 - (C[3,3] - C[4,4])*(C[1,1] + C[3,3] - 2*C[4,4])
-    if b^2 - 4*a*c < 0
-        error("CIJ.thom_st: S velocity too high or delta too negative")
+    C = zero(EC)
+    @inbounds begin
+        C[3,3] = vp^2
+        C[1,1] = C[2,2] = C[3,3]*(2*eps + 1)
+        C[4,4] = C[5,5] = vs^2
+        C[6,6] = C[4,4]*(2*gam + 1)
+        a = 2.0
+        b = 4*C[4,4]
+        c = C[4,4]^2 - 2*delst*C[3,3]^2 - (C[3,3] - C[4,4])*(C[1,1] + C[3,3] - 2*C[4,4])
+        if b^2 - 4*a*c < 0
+            error("CIJ.thom_st: S velocity too high or delta too negative")
+        end
+        C[1,3] = C[3,1] = C[2,3] = C[3,2] = (-b + sqrt(b^2 - 4*a*c))/(2*a)
+        C[1,2] = C[2,1] = C[1,1] - 2C[6,6]
     end
-    C[1,3] = C[3,1] = C[2,3] = C[3,2] = (-b + sqrt(b^2 - 4*a*c))/(2*a)
-    C[1,2] = C[2,1] = C[1,1] - 2C[6,6]
     return C
 end
 
@@ -203,12 +277,12 @@ function global_VTI(vp, vs, xi, phi, eta)
     C = phi*A
     N = xi*L
     C12 = A - 2N
-    return [ A  C12 F  0  0  0
-            C12  A  F  0  0  0
-             F   F  C  0  0  0
-             0   0  0  L  0  0
-             0   0  0  0  L  0
-             0   0  0  0  0  N]
+    return EC{DEFAULT_FLOAT}(( A,  C12, F,  0,  0,  0,
+                              C12,  A,  F,  0,  0,  0,
+                               F,   F,  C,  0,  0,  0,
+                               0,   0,  0,  L,  0,  0,
+                               0,   0,  0,  0,  L,  0,
+                               0,   0,  0,  0,  0,  N))
 end
 
 """
@@ -224,12 +298,12 @@ function Panning_VTI(vp, vs, xi, phi)
     C = phi*A
     F = A - 2*L
     C12 = A - 2*N
-    return [ A  C12 F  0  0  0
-            C12  A  F  0  0  0
-             F   F  C  0  0  0
-             0   0  0  L  0  0
-             0   0  0  0  L  0
-             0   0  0  0  0  N]
+    return EC{DEFAULT_FLOAT}(( A,  C12, F,  0,  0,  0,
+                              C12,  A,  F,  0,  0,  0,
+                               F,   F,  C,  0,  0,  0,
+                               0,   0,  0,  L,  0,  0,
+                               0,   0,  0,  0,  L,  0,
+                               0,   0,  0,  0,  0,  N))
 end
 
 """
@@ -249,7 +323,7 @@ by two periodic layers where each layer `i` is defined by:
 `C` is density-normalised.
 """
 function pitl(d1, vp1, vs1, rho1, d2, vp2, vs2, rho2)
-    C = zeros(6,6)
+    C = zero(EC)
     # Lamé parameters from velocities
     m1 = rho1*vs1^2
     m2 = rho2*vs2^2
@@ -261,19 +335,21 @@ function pitl(d1, vp1, vs1, rho1, d2, vp2, vs2, rho2)
     # D term, p. 785
     D = (d1 + d2)*(d1*l2p2m2 + d2*l1p2m1)
     # Eq. (7)
-    C[1,1] = ((d1+d2)^2*l1p2m1*l2p2m2 + 4*d1*d2*(m1 - m2)*((l1 + m1) - (l2 + m2)))/D
-    C[2,2] = C[1,1]
-    C[1,2] = C[2,1] = ((d1 + d2)^2*l1*l2 + 2*(l1*d1 + l2*d2)*(m2*d1 + m1*d2))/D
-    C[1,3] = ((d1 + d2)*(l1*d1*l2p2m2 + l2*d2*l1p2m1))/D
-    C[3,1] = C[2,3] = C[1,3]
-    C[3,2] = C[2,3]
-    C[3,3] = ((d1 + d2)^2*l1p2m1*l2p2m2)/D
-    C[4,4] = C[5,5] = (d1 + d2)*m1*m2/(d1*m2 + d2*m1)
-    C[6,6] = (m1*d1 + m2*d2)/(d1 + d2)
+    @inbounds begin
+        C[1,1] = ((d1+d2)^2*l1p2m1*l2p2m2 + 4*d1*d2*(m1 - m2)*((l1 + m1) - (l2 + m2)))/D
+        C[2,2] = C[1,1]
+        C[1,2] = C[2,1] = ((d1 + d2)^2*l1*l2 + 2*(l1*d1 + l2*d2)*(m2*d1 + m1*d2))/D
+        C[1,3] = ((d1 + d2)*(l1*d1*l2p2m2 + l2*d2*l1p2m1))/D
+        C[3,1] = C[2,3] = C[1,3]
+        C[3,2] = C[2,3]
+        C[3,3] = ((d1 + d2)^2*l1p2m1*l2p2m2)/D
+        C[4,4] = C[5,5] = (d1 + d2)*m1*m2/(d1*m2 + d2*m1)
+        C[6,6] = (m1*d1 + m2*d2)/(d1 + d2)
+    end
     # Normalise back to average density
     rho = (d1*rho1 + d2*rho2)/(d1 + d2)
-    C /= rho
-    return (C, rho)
+    C ./= rho
+    return C, rho
 end
 
 """
@@ -294,7 +370,7 @@ function tandon_and_weng(vp, vs, rho, del, c, vpi, vsi, rhoi)
     0 <= c <= 1 || error("CIJ.tandon_and_weng: `c` must be in range 0 - 1")
     vp == vpi && vs == vsi && rho == rhoi && return CIJ.iso(vp=vp, vs=vs), rho
 
-    C = zeros(6,6)
+    C = zero(EC)
     #  weighted average density
     rho_out = (1 - c)*rho + c*rhoi
 
@@ -392,7 +468,9 @@ function tandon_and_weng(vp, vs, rho, del, c, vpi, vsi, rhoi)
     CIJ.symm!(C)
 
     # apply density normalisation
-    C/rho_out, rho_out
+    C ./= rho_out
+    
+    C, rho_out
 end
 
 """
@@ -409,7 +487,7 @@ the number of cracks of radius ``a`` in a volume ``\nu``.
 The formulation is according to Hudson (1982), as given in Crampin (1984).
 """
 function hudson(vp, vs, rho, del, ϵ, vpi, vsi, rhoi)
-    error("`hudson` has not been tested yet")
+    # error("`hudson` has not been tested yet")
     ϵ > 0.1 && warn("Theory of Hudson (1982) only valid for `ϵ` < 0.1, but using ϵ = $ϵ")
     λ, μ, κ = lame(vp, vs, rho)
     λ′, μ′, κ′ = lame(vpi, vsi, rhoi)
@@ -421,22 +499,22 @@ function hudson(vp, vs, rho, del, ϵ, vpi, vsi, rhoi)
     X = 2μ*(3λ + 8μ)/(λ + 2μ)
     c⁰ = iso(lam=λ, mu=μ)
     # First-order correction from Hudson (1981)
-    c¹ = -ϵ/μ*[ (λ + 2μ)^2*U₁  λ*(λ + 2μ)*U₁  λ*(λ + 2μ)*U₁ 0    0      0
-                λ*(λ + 2μ)*U₁     λ^2*U₁         λ^2*U₁     0    0      0
-                λ*(λ + 2μ)*U₁     λ^2*U₁         λ^2*U₁     0    0      0
-                      0             0              0        0    0      0
-                      0             0              0        0  μ^2*U₃   0
-                      0             0              0        0    0    μ^2*U₃]
+    c¹ = -ϵ./μ .* @SMatrix [ (λ + 2μ)^2*U₁  λ*(λ + 2μ)*U₁  λ*(λ + 2μ)*U₁ 0    0      0
+                             λ*(λ + 2μ)*U₁     λ^2*U₁         λ^2*U₁     0    0      0
+                             λ*(λ + 2μ)*U₁     λ^2*U₁         λ^2*U₁     0    0      0
+                                   0             0              0        0    0      0
+                                   0             0              0        0  μ^2*U₃   0
+                                   0             0              0        0    0    μ^2*U₃]
     # Second-order correction from Hudson (1982)
-    c² = ϵ^2/15*[ (λ + 2μ)*q*U₁^2       λ*q*U₁^2             λ*q*U₁^2       0   0      0
-                     λ*q*U₁^2     λ^2*q/(λ + 2μ)*U₁^2  λ^2*q/(λ + 2μ)*U₁^2  0   0      0
-                     λ*q*U₁^2     λ^2*q/(λ + 2μ)*U₁^2  λ^2*q/(λ + 2μ)*U₁^2  0   0      0
-                        0                  0                    0           0   0      0
-                        0                  0                    0           0 X*U₃^2   0
-                        0                  0                    0           0   0    X*U₃^2]
-    c = c⁰ .+ c¹ .+ c²
+    c² = ϵ.^2 ./ 15 .* @SMatrix [ (λ + 2μ)*q*U₁^2       λ*q*U₁^2             λ*q*U₁^2       0   0      0
+                                     λ*q*U₁^2     λ^2*q/(λ + 2μ)*U₁^2  λ^2*q/(λ + 2μ)*U₁^2  0   0      0
+                                     λ*q*U₁^2     λ^2*q/(λ + 2μ)*U₁^2  λ^2*q/(λ + 2μ)*U₁^2  0   0      0
+                                        0                  0                    0           0   0      0
+                                        0                  0                    0           0 X*U₃^2   0
+                                        0                  0                    0           0   0    X*U₃^2]
     rho_bulk = (1 - ϵ)*rho + ϵ*rhoi
-    c./rho_bulk, rho_bulk
+    c = EC{DEFAULT_FLOAT}((c⁰ .+ c¹ .+ c²)./rho_bulk) 
+    c, rho_bulk
 end
 
 """
@@ -513,18 +591,18 @@ function phase_vels(C, az, inc)
     # and polarisation vectors (vec[:,i]).
     # They seem to be sorted into descending order of eigenvalue, but we double
     # check anyway.
-    eval, evec = eig(T)
-    ip = indmax(eval)
-    is2 = indmin(eval)
+    vals, vecs = LinearAlgebra.eigen(T)
+    ip = argmax(vals)
+    is2 = argmin(vals)
     is1 = 6 - ip - is2
-    vp  = sqrt(eval[ip])
-    vs1 = sqrt(eval[is1])
-    vs2 = sqrt(eval[is2])
-    # xp  = vec(evec[:,ip])
-    xs1 = vec(evec[:,is1])
-    # xs2 = vec(evec[:,is2])
+    vp  = sqrt(vals[ip])
+    vs1 = sqrt(vals[is1])
+    vs2 = sqrt(vals[is2])
+    # xp  = vec(vecs[:,ip])
+    xs1 = vecs[:,is1]
+    # xs2 = vec(vecs[:,is2])
     # Calculate S1 polarisation and amount of shear wave anisotropy
-    pol = get_pol(inc, az, vec(x), vec(xs1))
+    pol = get_pol(inc, az, x, xs1)
     avs = 200*(vs1 - vs2)/(vs1 + vs2)
     return (vp, vs1, vs2, pol, avs)
 end
@@ -541,23 +619,23 @@ function group_vels(C, az, inc)
     # Create the Christoffel matrix
     T = make_T(C, x)
     # Find eigenvectors, giving phase velocities
-    eval, evec = eig(T)
-    ip = indmax(eval)
-    is2 = indmin(eval)
+    vals, vecs = LinearAlgebra.eigen(T)
+    ip = indmax(vals)
+    is2 = indmin(vals)
     is1 = 6 - ip - is2
-    vp = sqrt(eval[ip])
-    vs1 = sqrt(eval[is1])
-    vs2 = sqrt(eval[is2])
-    xp = vec(evec[:,ip])
-    xs1 = vec(evec[:,is1])
-    xs2 = vec(evec[:,is2])
+    vp = sqrt(vals[ip])
+    vs1 = sqrt(vals[is1])
+    vs2 = sqrt(vals[is2])
+    xp = vec(vecs[:,ip])
+    xs1 = vec(vecs[:,is1])
+    xs2 = vec(vecs[:,is2])
     # Calculate group velocities, which are phase velocities projected onto
     # group velocity directions
-    pp = xp/vp
-    ps1 = xs1/vs1
-    ps2 = xs2/vs2
+    pp = xp./vp
+    ps1 = xs1./vs1
+    ps2 = xs2./vs2
     p = [pp'; ps1'; ps2']
-    vg = zeros(3)
+    vg = zero(MVector{3,float(eltype(C))})
     ijkl = VOIGT_CONTRACTION_MATRIX
     for i=1:3, j=1:3, k=1:3, l=1:3
         m = ijkl[i,j]
@@ -575,29 +653,30 @@ function get_pol(inc, az, x, xs1)
     u = incaz2up(inc, az)
     # Angle between the local up vector and the projected fast orientation
     v = cross(xs1p, u)
-    pol = rad2deg(atan2(norm(v), dot(xs1p, u)))
+    pol = rad2deg(atan(norm(v), dot(xs1p, u)))
     # If v is codirectional with x, then the angle is correct; otherwise, we're
     # the wrong way round
     if dot(x, v) < 0
         pol = -pol
     end
     # Put in range -90° to 90°
-    return modulo(pol + 90.0, 180.0) - 90.0
+    return mod(pol + 90.0, 180.0) - 90.0
 end
 
 function incaz2up(inc, az)
     a = deg2rad(az) + pi
     i = deg2rad(inc)
     sini = sin(i)
-    return [cos(a)*sini, -sin(a)*sini, cos(i)]
+    return @SVector [cos(a)*sini, -sin(a)*sini, cos(i)]
 end
 
+"""
+    make_T(C, x) -> T
+
+Create the Christoffel matrix, `T`, given the Voigt matrix `C` and unit vector `x`.
+"""
 function make_T(C, x)
-    # Create the Christoffel matrix, T
-    # INPUT:
-    #    C(6,6) : Voigt elasticity matrix
-    #    x(3)   : Direction of interest
-    T = zeros(3,3)
+    T = zero(MMatrix{3,3,float(eltype(C))})
     ijkl = VOIGT_CONTRACTION_MATRIX
     for i = 1:3, j = 1:3, k = 1:3, l = 1:3
         m = ijkl[i,j]
@@ -607,13 +686,13 @@ function make_T(C, x)
     return T
 end
 
+"Return a 3-vector which is the cartesian direction corresponding to
+ the azimuth `az` and inclination `inc` (degrees)"
 function incaz2cart(inc, az)
-    # Return a 3-vector which is the cartesian direction corresponding to
-    # the direction az, inc (degrees)
     i = deg2rad(inc)
     a = deg2rad(az)
     cosi = cos(i)
-    return [cos(a)*cosi, -sin(a)*cosi, sin(i)]
+    return @SVector [cos(a)*cosi, -sin(a)*cosi, sin(i)]
 end
 
 function VRH(VF1, C1, rh1, VF2, C2, rh2)
@@ -646,20 +725,26 @@ set of elastic constants, size n
 See: Hill, R., The elastic behaviour of a crystalline aggregate,
      P Phys Soc Lond A (1952) vol. 65 (389) pp. 349-355
 """
-function VRH(VF, C, rho)
-    size(VF) == size(C,1) == size(rho) || error("CIJ.VRH: Arrays are not the same lengths")
-    size(C)[2:3] == (6,6) || error("CIJ.VRH: C must have size (n,6,6)")
-    VF = VF./sum(VF)
-    voigt = zero(C)
-    reuss = zero(C)
-    Cave = zeros(6, 6)
+function VRH(VF, C::AbstractArray{T,3} where T, rho)
+    length(VF) == size(C,1) == length(rho) ||
+        throw(ArgumentError("arrays are not the same lengths"))
+    size(C, 2) == size(C, 3) == 6 || throw(ArgumentError("C must have size (n,6,6)"))
+    VRH(VF, [EC(C[i,:,:]) for i in 1:size(C, 1)], rho)
+end
+
+function VRH(VF, C::AbstractArray{<:EC}, rho)
+    error("VRH hasn't been tested yet")
+    length(VF) == length(C) == length(rho) || error("VF, C and rho must have same legnth")
+    ΣVF = sum(VF)
+    voigt = zero(EC)
+    reuss = zero(EC)
+    Cave = zero(EC)
     for k in 1:length(VF)
-        voigt += VF[k]*reshape(C[k,:,:], 6, 6)
-        reuss += VF[k]*C2S(reshape(C[k,:,:], 6, 6))
+        voigt .+= VF[k]/ΣVF.*C[k]
+        reuss .+= VF[k]/ΣVF.*C2S(C[k])
     end
-    reuss = S2C(reuss)
-    Cave = (voigt + reuss)/2
-    rhave = VF.*rho
+    Cave = (voigt .+ S2C(reuss))./2
+    rhave = sum(VF.*rho./ΣVF)
     Cave, rhave
 end
 
@@ -704,14 +789,14 @@ end
 
 Return the Voigt-Reuss-Hill bound on a tensor `C`'s bulk modulus `K`.
 """
-HillK(C) = (VoigtK(C) + ReussK(C))/2
+HillK(C) = (VoigtK(C) .+ ReussK(C))./2
 
 """
     HillG(C) -> G
 
 Return the Voigt-Reuss-Hill bound on a tensor `C`'s shear modulus `G`.
 """
-HillG(C) = (VoigtG(C) + ReussG(C))/2
+HillG(C) = (VoigtG(C) .+ ReussG(C))./2
 
 """
     Au(C) -> au
@@ -781,7 +866,8 @@ end
 
 Return the inverse of the stiffness matrix `C`, the compliance matrix `S`.
 """
-C2S(C) = inv(C)
+C2S(C) = LinearAlgebra.inv(C)
+C2S(C::EC) = LinearAlgebra.inv(C.data)
 
 """
     S2C(S) -> C
@@ -795,7 +881,8 @@ S2C(S) = C2S(S)
 
 Invert the stiffness matrix `C` in place, giving the compliance matrix `S`.
 """
-C2S!(C) = LinAlg.inv!(lufact!(C))
+C2S!(C) = C .= LinearAlgebra.inv!(LinearAlgebra.lu(C))
+C2S!(C::EC) = C2S!(C.data)
 
 """
     S2C!(S) -> C
@@ -833,7 +920,7 @@ function is_stable(C)
     end
     # Positive definite matrices have a Cholesky decomposition
     try
-        chol(C)
+        LinearAlgebra.cholesky(C)
     catch PosDefException
         return false
     end
@@ -846,12 +933,12 @@ end
 Return the normalised elastic constants `C` and density `rho` for olivine,
 handy for testing purposes
 """
-ol() = [320.5  68.1  71.6   0.0   0.0   0.0;
-         68.1 196.5  76.8   0.0   0.0   0.0;
-         71.6  76.8 233.5   0.0   0.0   0.0;
-          0.0   0.0   0.0  64.0   0.0   0.0;
-          0.0   0.0   0.0   0.0  77.0   0.0;
-          0.0   0.0   0.0   0.0   0.0  78.7]*1.e9/3355.0, 3355.0
+ol() = EC{DEFAULT_FLOAT}((320.5,  68.1,  71.6,   0.0,   0.0,   0.0,
+                           68.1, 196.5,  76.8,   0.0,   0.0,   0.0,
+                           71.6,  76.8, 233.5,   0.0,   0.0,   0.0,
+                            0.0,   0.0,   0.0,  64.0,   0.0,   0.0,
+                            0.0,   0.0,   0.0,   0.0,  77.0,   0.0,
+                            0.0,   0.0,   0.0,   0.0,   0.0,  78.7))*1.e9/3355.0, 3355.0
 
 
 """
@@ -876,7 +963,7 @@ function read(file::AbstractString)
     isfile(file) || error("CIJ.read: File \"$file\" does not exist.")
     d = readdlm(file)
     size(d, 1) == 22 || error("CIJ.read: File \"$file\" is not in expected format")
-    C = zeros(6,6)
+    C = zero(EC)
     rho = 0
     for l in 1:22
         i = Int(d[l,1])
@@ -912,7 +999,7 @@ end of the file to describe the constants.  By default, the following is written
 
 Such files usually have a `.ecs` file extension.
 """
-function write(C::Array{<:Number,2}, rho::Number, file, comment::String="")
+function Base.write(C::Array{<:Number,2}, rho::Number, file, comment::String="")
     is_6x6(C) || throw(ArgumentError("Elastic constants must be a 6x6 matrix"))
     is_stable(C) && is_symm(C) ||
         warn("CIJ.write: Elastic constants are not in the right form.  "
@@ -945,6 +1032,10 @@ symm(C) = symm!(deepcopy(C))
 
 Fill in the lower half of 6x6 matrix `C` with the upper half, making it symmetrical,
 and returning `C`.
+
+If `C` is an `EC`, then we assume it is synnetrical, since it is impossible to make
+an asymmetrical `EC` without directly accessing its `.data` field, which is not
+a supported way of manipulating `EC`s.
 """
 function symm!(C)
     for i in 1:6, j in i+1:6
@@ -952,6 +1043,9 @@ function symm!(C)
     end
     C
 end
+# Because setindex! sets both upper and lower halves, assume symmetrical.
+# May not be true if c.data has been accessed directly.
+symm!(c::EC) = c
 
 """
     is_symm(C) -> ::Bool
@@ -964,6 +1058,7 @@ function is_symm(C)
     end
     return true
 end
+is_symm(::EC) = true
 
 """
     is_6x6(C) -> ::Bool
@@ -971,16 +1066,7 @@ end
 Return `true` if C is a 6x6 matrix.
 """
 is_6x6(C) = size(C) == (6,6)
-
-function modulo(a, b)
-    # Replicate the Fortran modulo function, where the result is always
-    # positive
-    m = a%b
-    while m < 0
-        m += b
-    end
-    return m
-end
+is_6x6(::EC) = true
 
 """
     lame(vp, vs, ρ) -> λ, μ, κ
@@ -1014,7 +1100,7 @@ The constants are symmetric about the 3-axis.
 function vti(; vpv=nothing, vsv=nothing, vph=nothing, vsh=nothing, eta=nothing,
         A=nothing, C=nothing, L=nothing, N=nothing, F=nothing)
     if all(x->x!==nothing, (vpv, vsv, vph, vsh, eta))
-        c = zeros(6,6)
+        c = zero(EC)
         c[1,1] = c[2,2] = vph^2
         c[3,3] = vpv^2
         c[4,4] = c[5,5] = vsv^2
@@ -1023,12 +1109,12 @@ function vti(; vpv=nothing, vsv=nothing, vph=nothing, vsh=nothing, eta=nothing,
         c[1,2] = c[2,1] = c[1,1] - 2c[6,6]
         c
     elseif all(x->x!==nothing, (A, C, L, N, F))
-        Float64[  A  A-2N  F   0   0   0
-                A-2N   A   F   0   0   0
-                  F    F   C   0   0   0
-                  0    0   0   L   0   0
-                  0    0   0   0   L   0
-                  0    0   0   0   0   N]
+        EC{DEFAULT_FLOAT}((  A,  A-2N,  F,   0,   0,   0,
+                           A-2N,   A,   F,   0,   0,   0,
+                             F,    F,   C,   0,   0,   0,
+                             0,    0,   0,   L,   0,   0,
+                             0,    0,   0,   0,   L,   0,
+                             0,    0,   0,   0,   0,   N))
     else
         throw(ArgumentError("Insufficient parameters defined."))
     end
