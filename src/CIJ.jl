@@ -756,7 +756,7 @@ Return the matrix `K` which represents the matrix with which to transform a Voig
 6x6 matrix by the 3x3 transformation matrix `M`.
 """
 @inline function _transformation_matrix(M)
-    K = MMatrix{6, 6, Float64}()
+    K = MMatrix{6, 6, Float64}(undef)
     @inbounds for i = 1:3
         i1 = (i + 1)%3
         i1 = i1 == 0 ? 3 : i1
