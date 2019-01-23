@@ -11,7 +11,7 @@ Deal with linear elastic constants, especially for geophysical applications.
 module CIJ
 
 import Dates.now
-using LinearAlgebra: cross, dot, norm
+import LinearAlgebra: cross, dot, norm
 import Printf.@printf
 
 using StaticArrays
