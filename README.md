@@ -10,22 +10,27 @@ Although not registered as an official package, CIJ.jl can be added to your
 Julia install like so:
 
 ```julia
-Pkg.clone("https://github.com/anowacki/CIJ.jl")
+julia> ] # Type ']' to enter pkg mode
+
+(v1.1) pkg> add https://github.com/anowacki/CIJ.jl
 ```
 
 You then need only do
 
 ```julia
-import CIJ
+julia> import CIJ
 ```
 
 and if that works, you're ready to go.
 
 
 ## How to use
-CIJ.jl, to make your life as easy as possible, does not define a type for
-elastic constants, but relies on them being arrays.  The basic kind is the
-Voigt matrix, which is a 6 &times; 6 array.
+CIJ.jl, to make your life as easy as possible, does not insist on your using
+a special type for elastic constants, but relies on them being `AbstractArray`s
+of an elastic tensor's Voigt matrix.
+The Voigt matrix is a 6 &times; 6 array representing the full
+3 &times; 3 &times; 3 &times; 3 &times; tensor, subject to symmetries present
+for linear elasticity.
 
 Throughout CIJ.jl, we make no assumptions about the *units* of a matrix `C`,
 but when it does matter (for instance, calculating phase velocities with
@@ -36,8 +41,10 @@ constants (i.e., the units are m<sup>2</sup>&nbsp;s<sup>-2</sup>), sometimes cal
 Let's try out a simple example of what we can do:
 
 ```julia
-C = zeroes(6, 6)
-CIJ.is_stable(C) # -> false
+julia> C = zeros(6, 6);
+
+julia> CIJ.is_stable(C)
+false
 ```
 
 Here, the `is_stable()` function tells one whether a set of elastic constants
@@ -45,24 +52,63 @@ Here, the `is_stable()` function tells one whether a set of elastic constants
 zero is not.  Olivine, however, should be, so
 
 ```julia
-C, rho = CIJ.ol() # Return density-normalised constants, and density, for olivine
-is_stable(C) # -> true
+julia> C, rho = CIJ.ol(); # Return density-normalised constants, and density, for olivine
+
+julia> is_stable(C)
+true
 ```
 
 is not a surprise.
 
+## `EC` type
+
+Whilst you can deal with plain `Array`s, CIJ exports the `EC` type which is a
+wrapper around a `StaticArrays.MMatrix`.
+
+Calculations using this type are quicker.  For instance, finding the compliance
+matrix *S* from the stiffness matrix *C* is found by matrix inversion, and this
+is about twice as fast when using `EC`s rather than plain `Array`s.
+
+`EC`s are mutable and can be treated just like any other 6 &times; 6 matrix,
+including accessing and setting elements like `C[i,j]`.
+
+Construct an `EC` object by calling the `EC()` constructor:
+
+```julia
+julia> EC([10i+j for i in 1:6, j in 1:6])
+6×6 EC{Float64}:
+ 11.0  12.0  13.0  14.0  15.0  16.0
+ 12.0  22.0  23.0  24.0  25.0  26.0
+ 13.0  23.0  33.0  34.0  35.0  36.0
+ 14.0  24.0  34.0  44.0  45.0  46.0
+ 15.0  25.0  35.0  45.0  55.0  56.0
+ 16.0  26.0  36.0  46.0  56.0  66.0
+```
+
+Note that `EC`s are enforced to be symmetric, and will copy the upper half
+of the input matrix into the bottom half.  Subsequent modification of any
+element will be reflected in both upper and lower halves automatically,
+so `EC`s cannot be non-symmetric.
+
+To specify the type of the elements `T`, use the parametric constructor,
+`EC{T}()`.
+
 ### Calculating phase velocities
 One of the common uses for the package is to compute the *phase velocities* in
 a given direction through some elastic constants.  This is done using the
-`phase_vels()` function like so:
+`phase_vels()` function, which returns a `NamedTuple`, like so:
 
 ```julia
-C, rho = CIJ.ol()
-az, inc = 20, 45 # Directions
-vp, vs1, vs2, pol, avs = CIJ.phase_vels(C, az, inc)
+julia> C, rho = CIJ.ol();
+
+julia> az, inc = 20, 45; # Directions
+
+julia> vp, vs1, vs2, pol, avs = CIJ.phase_vels(C, az, inc)
+(vp = 8590.639816324323, vs1 = 5422.968116295959, vs2 = 4602.70348828534, pol = -20.682503753509465, avs = 16.363285381017125)
 ```
 
 `vp`, `vs1` and `vs2` and so on, are velocities in m&nbsp;s<sup>-1</sup>,
+assuming `C` is in m<sup>2</sup>&nbsp;s<sup>-2</sup>,
 `pol` is the orientation of the fast shear wave in degrees, and `avs` is the
 percentage shear wave anisotropy along this direction.
 
