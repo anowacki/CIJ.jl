@@ -608,7 +608,7 @@ function phase_vels(C, az, inc)
     # Calculate S1 polarisation and amount of shear wave anisotropy
     pol = get_pol(inc, az, x, xs1)
     avs = 200*(vs1 - vs2)/(vs1 + vs2)
-    return (vp, vs1, vs2, pol, avs)
+    return (vp=vp, vs1=vs1, vs2=vs2, pol=pol, avs=avs)
 end
 
 function group_vels(C, az, inc)
@@ -687,7 +687,7 @@ function make_T(C, x)
         n = ijkl[k,l]
         T[i,k] = T[i,k] + C[m,n]*x[j]*x[l]
     end
-    return T
+    return LinearAlgebra.Hermitian(T) # Real-symmetric
 end
 
 "Return a 3-vector which is the cartesian direction corresponding to
@@ -951,6 +951,7 @@ function is_stable(C)
     end
     return true
 end
+is_stable(C::EC) = is_stable(C.data)
 
 """
     ol() -> C, rho
