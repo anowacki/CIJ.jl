@@ -36,11 +36,14 @@ export
     Au,
     C2S,
     C2S!,
+    Hill_average,
     HillG,
     HillK,
+    Reuss_average,
     ReussG,
     ReussK,
     VRH,
+    Voigt_average,
     VoigtG,
     VoigtK,
     is_stable,
@@ -706,7 +709,7 @@ end
 """
     VRH(VF1, C1, rh1, VF2, C2, rh2) -> C, rho
 
-Return the Voigt-Reuss-Hhill-averaged 6x6 Voigt stiffness matrix `C` from combining
+Return the Voigt-Reuss-Hill-averaged 6x6 Voigt stiffness matrix `C` from combining
 two sets of elastic constants with volume fractions `VF{1,2}`, constants `C{1,2}`
 and density `rh{1,2}`.
 
@@ -790,14 +793,35 @@ end
 
 Return the Voigt-Reuss-Hill bound on a tensor `C`'s bulk modulus `K`.
 """
-HillK(C) = (VoigtK(C) .+ ReussK(C))./2
+HillK(C) = (VoigtK(C) + ReussK(C))/2
 
 """
     HillG(C) -> G
 
 Return the Voigt-Reuss-Hill bound on a tensor `C`'s shear modulus `G`.
 """
-HillG(C) = (VoigtG(C) .+ ReussG(C))./2
+HillG(C) = (VoigtG(C) + ReussG(C))/2
+
+"""
+    Voigt_average(C) -> ⟨C⟩
+
+Return the Voigt isotropic average of a tensor `C`.
+"""
+Voigt_average(C) = iso(K=VoigtK(C), G=VoigtG(C))
+
+"""
+    Reuss_average(C) -> ⟨C⟩
+
+Return the Reuss isotropic average of a tensor `C`.
+"""
+Reuss_average(C) = iso(K=ReussK(C), G=ReussG(C))
+
+"""
+    Hill_average(C) -> ⟨C⟩
+
+Return the Hill isotropic average of a tensor `C`.
+"""
+Hill_average(C) = iso(K=HillK(C), G=HillG(C))
 
 """
     Au(C) -> au
