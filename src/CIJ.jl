@@ -961,9 +961,9 @@ In this version of the code, all elastic constants must be specified, even if
 they are 0.
 """
 function read(file::AbstractString)
-    isfile(file) || error("CIJ.read: File \"$file\" does not exist.")
+    isfile(file) || error("file \"$file\" does not exist.")
     d = readdlm(file)
-    size(d, 1) == 22 || error("CIJ.read: File \"$file\" is not in expected format")
+    size(d, 1) == 22 || error("file \"$file\" is not in expected format")
     C = zero(EC)
     rho = 0
     for l in 1:22
@@ -972,7 +972,7 @@ function read(file::AbstractString)
         if i == j == 7
             rho = d[l,3]
         else
-            1 <= i <= j <= 6 || error("CIJ.read: Unexpected indices '$i' and '$j' in file \"$file\"")
+            1 <= i <= j <= 6 || error("unexpected indices '$i' and '$j' in file \"$file\"")
             C[i,j] = d[l,3]
             C[j,i] = d[l,3]
         end
@@ -1000,25 +1000,28 @@ end of the file to describe the constants.  By default, the following is written
 
 Such files usually have a `.ecs` file extension.
 """
-function Base.write(C::Array{<:Number,2}, rho::Number, file, comment::String="")
-    is_6x6(C) || throw(ArgumentError("Elastic constants must be a 6x6 matrix"))
+function Base.write(C::Union{EC,Array{<:Number,2}}, rho::Number, file, comment::AbstractString="")
+    is_6x6(C) || throw(ArgumentError("elastic constants must be an EC or 6x6 matrix"))
     is_stable(C) && is_symm(C) ||
-        warn("CIJ.write: Elastic constants are not in the right form.  "
+        warn("elastic constants are not in the right form.  "
               * "May be asymmetric or unstable.")
-    isdir(dirname(file)) || error("CIJ.save: Directory \"$(dirname(file))\" does not exist")
-    f = open(file, "w")
-    for i = 1:6, j=i:6
-        @printf(f, "%d %d %12.6e\n", i, j, C[i,j]*rho)
+    isdir(dirname(file)) || error("directory \"$(dirname(file))\" does not exist")
+    open(file, "w") do f
+        for i = 1:6, j=i:6
+            @printf(f, "%d %d %12.6e\n", i, j, C[i,j]*rho)
+        end
+        @printf(f, "7 7 %9.3f\n", rho)
+        if comment != ""
+            if comment[1] != '#'
+                comment = "# " * comment
+            end
+            write(f, replace(chomp(comment), "\n"=>"\n# ") * "\n")
+        end
+        user = ENV["USER"]
+        hostname = readchomp(`hostname`)
+        write(f, "# Saved by user $user on $hostname on $(now()) using CIJ.jl on Julia $VERSION\n")
     end
-    @printf(f, "7 7 %9.3f\n", rho)
-    if comment != ""
-        if comment[1] != '#' comment = "# " * comment end
-        write(f, replace(chomp(comment), "\n", "\n# ") * "\n")
-    end
-    user = ENV["USER"]
-    hostname = readchomp(`hostname`)
-    write(f, "# Saved by user $user on $hostname on $(now()) using Julia $VERSION\n")
-    close(f)
+    nothing
 end
 
 """
