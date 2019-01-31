@@ -197,9 +197,13 @@ end
     thom(vp, vs, eps, gam, del) -> C
 
 Return the 6x6 Voigt matrix defined `C` by the weak anisotropy parameters of
-Thomsen (1986) Weak elastic anisotropy.  Geophysics, 51, 10, 1954-1966.
+Thomsen (1986).
 
 Output is density-normalised tensor.
+
+### References
+
+Thomsen, L. (1986).  Weak elastic anisotropy.  Geophysics, 51, 10, 1954-1966.
 """
 function thom(vp, vs, eps, gam, del)
     if vp <= 0
@@ -651,8 +655,8 @@ function group_vels(C, az, inc)
     return vg[1], vg[2], vg[3]
 end
 
-function get_pol(inc, az, x, xs1)
-    # Projection of fast shear wave polarisation onto wavefront plane
+"Projection of fast shear wave polarisation onto wavefront plane"
+function get_pol(inc, az, x, xs1)    
     xs1p = cross(x, cross(x, xs1))
     xs1p /= norm(xs1p)
     # Local up vector
@@ -669,6 +673,13 @@ function get_pol(inc, az, x, xs1)
     return mod(pol + 90.0, 180.0) - 90.0
 end
 
+"""
+    incaz2up(inc, az) -> ::SVector{3}
+
+For a vector pointing along a given azimuth `az` and inclination `inc`,
+return the local 'up' direction, which is normal to the original direction and
+within the plane defined by it and the z-axis.
+"""
 function incaz2up(inc, az)
     a = deg2rad(az) + pi
     i = deg2rad(inc)
@@ -807,21 +818,21 @@ HillG(C) = (VoigtG(C) + ReussG(C))/2
 """
     Voigt_average(C) -> ⟨C⟩
 
-Return the Voigt isotropic average of a tensor `C`.
+Return the Voigt isotropic average of a single tensor `C`.
 """
 Voigt_average(C) = iso(K=VoigtK(C), G=VoigtG(C))
 
 """
     Reuss_average(C) -> ⟨C⟩
 
-Return the Reuss isotropic average of a tensor `C`.
+Return the Reuss isotropic average of a single tensor `C`.
 """
 Reuss_average(C) = iso(K=ReussK(C), G=ReussG(C))
 
 """
     Hill_average(C) -> ⟨C⟩
 
-Return the Hill isotropic average of a tensor `C`.
+Return the Hill isotropic average of a single tensor `C`.
 """
 Hill_average(C) = iso(K=HillK(C), G=HillG(C))
 
