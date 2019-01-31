@@ -87,27 +87,41 @@ is issued for non-symmetric input, unless `warn` is `true`.
 struct EC{T} <: AbstractArray{T,2}
     data::MArray{Tuple{6,6},T,2,36}
 
+    # Arbitrary input requires symmetrisation and conversion to MMatrix if not already
     function EC{T}(data; warn=false) where T
+        if data isa AbstractArray
+            size(data) == (6,6) || throw(ArgumentError("ECs must have dimensions 6×6"))
+        elseif data isa NTuple
+            length(data) == 36 || throw(ArgumentError("ECs must have length 36"))
+        end
         ec = new{T}(MMatrix{6,6,T}(data))
-        if warn
-            atol = √eps(T)
-            for i in 1:6, j in i+1:6
-                if !isapprox(ec[i,j], ec[j,i], atol=atol)
-                    @warn("input matrix not symmetrical: taking upper half")
-                    break
-                end
-            end
-        end
-        for j in 1:6, i in j+1:6
-            ec[i,j] = ec[j,i]
-        end
-        ec
+        _make_symmetric!(ec; warn=warn)
     end
+    # Construction with another EC doesn't require symmetrisation
+    EC{T}(ec::EC; warn=false) where T = new{T}(ec.data)
 end
 
-EC(x::AbstractArray{T}; kwargs...) where T = EC{float(T)}(MMatrix{6,6}(x); kwargs...)
-EC{T}(x::NTuple{36}; kwargs...) where T = EC{T}(MArray{Tuple{6,6}}(x); kwargs...)
-EC(x::NTuple{36,T}; kwargs...) where T = EC{DEFAULT_FLOAT}(MArray{Tuple{6,6},DEFAULT_FLOAT}(x); kwargs...)
+"Enforce symmetry in a 6×6 array.  No checks on shape performed."
+function _make_symmetric!(x; warn=false)
+    if warn
+        atol = √eps(eltype(x))
+        @inbounds for i in 1:6, j in i+1:6
+            if !isapprox(x[i,j], x[j,i], atol=atol)
+                @warn("input matrix not symmetrical: taking upper half")
+                break
+            end
+        end
+    end
+    # Copy upper to lower half
+    @inbounds for j in 1:6, i in j+1:6
+        x[i,j] = x[j,i]
+    end
+    x
+end
+
+EC(x::AbstractArray{T}; kwargs...) where T = EC{float(T)}(x; kwargs...)
+EC(x::NTuple{36,T}; kwargs...) where T = EC{float(T)}(x; kwargs...)
+EC(c; kwargs...) = EC{DEFAULT_FLOAT}(x; kwargs...)
 
 Base.size(x::EC) = (6,6)
 Base.length(x::EC) = 36
