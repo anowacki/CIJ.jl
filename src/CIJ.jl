@@ -712,34 +712,43 @@ function incaz2cart(inc, az)
     return @SVector [cos(a)*cosi, -sin(a)*cosi, sin(i)]
 end
 
+"""
+    VRH(VF₁, C₁, ρ₁, VF₂, C₂, ρ₂) -> ⟨C⟩, ⟨ρ⟩
+
+Return the Voigt-Reuss-Hill-averaged 6x6 Voigt stiffness matrix `C` from combining
+two sets of elastic constants with volume fractions `VF₁,₂`, constants `C₁,₂`
+and density `ρ₁,₂`.
+"""
 function VRH(VF1, C1, rh1, VF2, C2, rh2)
     # Return the VRH elasticity and density
     voigt = (C1.*VF1 + C2.*VF2)/(VF1 + VF2)
     reuss = (C2S(C1).*VF1 + C2S(C2).*VF2)/(VF1 + VF2)
-    return ((voigt + S2C(reuss))/2, (rh1*VF1 + rh2*VF2)/(VF1 + VF2))
+    return ((voigt + S2C(reuss))./2, (rh1*VF1 + rh2*VF2)/(VF1 + VF2))
 end
 
 """
-    VRH(VF1, C1, rh1, VF2, C2, rh2) -> C, rho
+    VRH(VF, C, ρ) -> ⟨C⟩, ⟨ρ⟩
 
-Return the Voigt-Reuss-Hill-averaged 6x6 Voigt stiffness matrix `C` from combining
-two sets of elastic constants with volume fractions `VF{1,2}`, constants `C{1,2}`
-and density `rh{1,2}`.
-
-    VRH(VF, C, rho) -> C, rho
-
-Return the Voigt-Reus-Hill-averaged 6x6 Voigt stiffness matrix `C` and density `rho`
+Return the Voigt-Reus-Hill-averaged 6x6 Voigt stiffness matrix `⟨C⟩` and density `⟨ρ⟩`
 from combining n sets of elastic constants and densities, whose proportions are
-listed in `VF`, where n is the number of constants and length of `VF` and `rho`.
+listed in `VF`, where n is the number of constants and length of `VF` and `ρ`.
+
+    VRH(C) -> ⟨C⟩
+
+Compute the average when all tensors have the same density and equal volume fraction.
+
+### Arguments
 
 `VF`: A vector (which need not sum to 1) containing the relative proportions of each
 set of elastic constants, size n
 
-`C`: A nx6x6 array of elastic constants
+`C`: A n×6×6 array of elastic constants, or an n-length vector of `EC`s.
 
-`rho`: A vector of densities of length n.
+`ρ`: A vector of densities of length n.
 
-See: Hill, R., The elastic behaviour of a crystalline aggregate,
+### References
+
+Hill, R., The elastic behaviour of a crystalline aggregate,
      P Phys Soc Lond A (1952) vol. 65 (389) pp. 349-355
 """
 function VRH(VF, C::AbstractArray{T,3} where T, rho)
@@ -749,13 +758,13 @@ function VRH(VF, C::AbstractArray{T,3} where T, rho)
     VRH(VF, [EC(C[i,:,:]) for i in 1:size(C, 1)], rho)
 end
 
-function VRH(VF, C::AbstractArray{<:EC}, rho)
-    error("VRH hasn't been tested yet")
-    length(VF) == length(C) == length(rho) || error("VF, C and rho must have same legnth")
+function VRH(VF, C::AbstractArray{<:EC{T}}, rho) where T
+    # error("VRH hasn't been tested yet")
+    length(VF) == length(C) == length(rho) || error("VF, C and rho must have same length")
     ΣVF = sum(VF)
-    voigt = zero(EC)
-    reuss = zero(EC)
-    Cave = zero(EC)
+    voigt = zero(EC{T})
+    reuss = zero(EC{T})
+    Cave = zero(EC{T})
     for k in 1:length(VF)
         voigt .+= VF[k]/ΣVF.*C[k]
         reuss .+= VF[k]/ΣVF.*C2S(C[k])
@@ -763,6 +772,21 @@ function VRH(VF, C::AbstractArray{<:EC}, rho)
     Cave = (voigt .+ S2C(reuss))./2
     rhave = sum(VF.*rho./ΣVF)
     Cave, rhave
+end
+
+function VRH(C::AbstractArray{<:EC{T}}) where T
+    n = length(C)
+    Cave = zero(EC{T})
+    voigt = similar(Cave)
+    reuss = similar(Cave)
+    S = [C2S(CC) for CC in C]
+    @inbounds for k in 1:n
+        for j in 1:6, i in j:6
+            voigt[i,j] += C[k][i,j]
+            reuss[i,j] += S[k][i,j]
+        end
+    end
+    Cave./n
 end
 
 """
