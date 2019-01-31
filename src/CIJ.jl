@@ -892,7 +892,7 @@ end
 Return the inverse of the stiffness matrix `C`, the compliance matrix `S`.
 """
 C2S(C) = LinearAlgebra.inv(C)
-C2S(C::EC) = LinearAlgebra.inv(C.data)
+C2S(C::EC{T}) where T = EC{T}(LinearAlgebra.inv(C.data))
 
 """
     S2C(S) -> C
@@ -907,7 +907,7 @@ S2C(S) = C2S(S)
 Invert the stiffness matrix `C` in place, giving the compliance matrix `S`.
 """
 C2S!(C) = C .= LinearAlgebra.inv!(LinearAlgebra.lu(C))
-C2S!(C::EC) = C2S!(C.data)
+C2S!(C::EC{T}) where T = EC{T}(C2S!(C.data))
 
 """
     S2C!(S) -> C
