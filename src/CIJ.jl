@@ -117,6 +117,8 @@ Base.IndexStyle(::Type{EC}) = IndexStyle(MMatrix)
 
 Base.zero(::Type{EC{T}}) where T = EC{T}(zero(MMatrix{6,6,T}))
 Base.zero(::Type{EC}) = zero(EC{DEFAULT_FLOAT})
+Base.zero(::EC{T}) where T = zero(EC{T})
+
 
 #=
     Functions
