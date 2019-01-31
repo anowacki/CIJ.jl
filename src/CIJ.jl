@@ -168,7 +168,7 @@ function cijkl(C)
         error("CIJ.cijkl: Input must be a 6x6 array")
     end
     c = MArray{Tuple{3,3,3,3},eltype(C),4,81}(undef)
-    for i = 1:3, j = 1:3, k = 1:3, l = 1:3
+    @inbounds for i = 1:3, j = 1:3, k = 1:3, l = 1:3
         c[i,j,k,l] = C[a[i,j],a[k,l]]
     end
     return c
@@ -185,7 +185,7 @@ function cij(c)
         error("CIJ.cij: Input must be a 3x3x3x3 tensor")
     end
     C = zero(EC{float(eltype(c))})
-    for i = 1:3, j = i:3, k = 1:3, l = k:3
+    @inbounds for i = 1:3, j = i:3, k = 1:3, l = k:3
         C[a[i,j],a[k,l]] = c[i,j,k,l]
     end
     return C
@@ -682,7 +682,7 @@ Create the Christoffel matrix, `T`, given the Voigt matrix `C` and unit vector `
 function make_T(C, x)
     T = zero(MMatrix{3,3,float(eltype(C))})
     ijkl = VOIGT_CONTRACTION_MATRIX
-    for i = 1:3, j = 1:3, k = 1:3, l = 1:3
+    @inbounds for i = 1:3, j = 1:3, k = 1:3, l = 1:3
         m = ijkl[i,j]
         n = ijkl[k,l]
         T[i,k] = T[i,k] + C[m,n]*x[j]*x[l]
