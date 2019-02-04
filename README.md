@@ -149,11 +149,6 @@ help?> CIJ.phase_vels
   the x3 axis.
 ```
 
-## Dependencies
-None, apart from Julia itself.  I do not test CIJ.jl on versions older than
-`v0.3`, however.
-
-
 ## Other software
 
 * If you use MATLAB, then you should use [MSAT](https://github.com/andreww/MSAT/).

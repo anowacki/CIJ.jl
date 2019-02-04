@@ -119,9 +119,9 @@ function _make_symmetric!(x; warn=false)
     x
 end
 
-EC(x::AbstractArray{T}; kwargs...) where T = EC{float(T)}(x; kwargs...)
+EC(x::AbstractArray{T}; kwargs...) where {T<:Number} = EC{float(T)}(x; kwargs...)
 EC(x::NTuple{36,T}; kwargs...) where T = EC{float(T)}(x; kwargs...)
-EC(c; kwargs...) = EC{DEFAULT_FLOAT}(x; kwargs...)
+EC(x; kwargs...) = EC{DEFAULT_FLOAT}(x; kwargs...)
 
 Base.size(x::EC) = (6,6)
 Base.length(x::EC) = 36
@@ -144,9 +144,9 @@ Return an isotropic Voigt stiffness matrix `C` from a pair of the following:
 
 `vp`, `vs` : Isotropic velocities in m/s
 
-`lam`, `mu`: Lamé parameters divided by density in m^2/s^2
+`lam`, `mu`: Lamé parameters **divided by density** in m^2/s^2
 
-`K`, `G`   : Bulk and shear moduli dvided by density in m^2/s^2
+`K`, `G`   : Bulk and shear moduli **divided by density** in m^2/s^2
 """
 function iso(; vp=nothing, vs=nothing, lam=nothing, mu=nothing, K=nothing, G=nothing)
     C = zero(EC)
@@ -164,7 +164,7 @@ function iso(; vp=nothing, vs=nothing, lam=nothing, mu=nothing, K=nothing, G=not
             C[4,4] = G
             C[1,2] = C[1,1] - 2C[4,4]
         else
-            error("iso: Must request a pair of vp,vs; lam,mu; K,G")
+            throw(ArgumentError("iso: Must request a pair of vp,vs; lam,mu; K,G"))
         end
         C[2,2] = C[3,3] = C[1,1]
         C[5,5] = C[6,6] = C[4,4]
