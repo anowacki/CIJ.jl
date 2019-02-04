@@ -1,5 +1,9 @@
 # CIJ.jl
 
+[![Build Status](https://travis-ci.org/anowacki/CIJ.jl.svg?branch=master)](https://travis-ci.org/anowacki/CIJ.jl)
+[![Build status](https://ci.appveyor.com/api/projects/status/lki0bk4vrqvrh6qg?svg=true)](https://ci.appveyor.com/project/AndyNowacki/cij-jl)
+[![Coverage Status](https://coveralls.io/repos/github/anowacki/CIJ.jl/badge.svg?branch=master)](https://coveralls.io/github/anowacki/CIJ.jl?branch=master)
+
 ## What is CIJ.jl?
 A [Julia](http://julialang.org) package for dealing with linear elastic
 constants, with particular applicability to geophysics problems.
