@@ -46,6 +46,7 @@ export
     Voigt_average,
     VoigtG,
     VoigtK,
+    is_iso,
     is_stable,
     phase_vels,
     # Conversion between representations
@@ -943,7 +944,7 @@ end
 Return the inverse of the stiffness matrix `C`, the compliance matrix `S`.
 """
 C2S(C) = LinearAlgebra.inv(C)
-C2S(C::EC{T}) where T = EC{T}(LinearAlgebra.inv(C.data))
+C2S(C::EC{T}) where T = EC{T}(C2S(C.data))
 
 """
     S2C(S) -> C
@@ -958,7 +959,7 @@ S2C(S) = C2S(S)
 Invert the stiffness matrix `C` in place, giving the compliance matrix `S`.
 """
 C2S!(C) = C .= LinearAlgebra.inv!(LinearAlgebra.lu(C))
-C2S!(C::EC{T}) where T = EC{T}(C2S!(C.data))
+C2S!(C::EC) = C .= C2S(C.data)
 
 """
     S2C!(S) -> C
@@ -972,13 +973,12 @@ S2C!(S) = C2S!(S)
 
 Return `true` if `C` is isotropic.
 """
-function is_iso(C)
-    is_stable(C) || error("CIJ.is_iso: Not a valid elasticity matrix")
-    all(abs((diag(C[2:3,2:3]) - C[1,1])) .< eps()) &&
-        all(abs(diag(C[5:6,5:6]) - C[4,4]) .< eps()) &&
-        all(abs([C[1,2] C[1,3] C[2,3]] - (C[1,1] - 2C[4,4])) .< eps()) &&
-        return true
-    return false
+function is_iso(C; atol=eps(eltype(C)))
+    all(x->isapprox(C[1,1], x, atol=atol), (C[2,2], C[3,3])) &&
+    all(x->isapprox(C[4,4], x, atol=atol), (C[5,5], C[6,6])) &&
+    all(x->isapprox(C[1,1]-2C[4,4], x, atol=atol), (C[1,2], C[1,3], C[2,3])) &&
+    all(x->isapprox(0, x, atol=atol), C[i,j] for i in 1:3 for j in 4:6) &&
+    all(x->isapprox(0, x, atol=atol), (C[4,5], C[4,6], C[5,6]))
 end
 
 """
@@ -988,11 +988,11 @@ Return `false` if the input 6x6 matrix `C` is not positive definite (symmetric)
 and hence not dynamically stable.
 """
 function is_stable(C)
-    if ! is_6x6(C)
-        error("CIJ.is_stable: Matrix must be 6x6")
+    if !is_6x6(C)
+        @error("CIJ.is_stable: Matrix must be 6x6")
     end
-    if ! is_symm(C)
-        warn("CIJ.is_stable: Matrix is not symmetrical: Using upper half only")
+    if !is_symm(C)
+        @warn("CIJ.is_stable: Matrix is not symmetrical: Using upper half only")
     end
     # Positive definite matrices have a Cholesky decomposition
     try
