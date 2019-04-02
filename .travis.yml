@@ -14,6 +14,4 @@ matrix:
   allow_failures:
     - julia: nightly
 
-# Coverage submission currently broken due to
-#     https://github.com/JuliaWeb/MbedTLS.jl/issues/193
-# coveralls: true
+coveralls: true
