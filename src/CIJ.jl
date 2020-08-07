@@ -1113,7 +1113,7 @@ symm(C) = symm!(deepcopy(C))
 Fill in the lower half of 6x6 matrix `C` with the upper half, making it symmetrical,
 and returning `C`.
 
-If `C` is an `EC`, then we assume it is synnetrical, since it is impossible to make
+If `C` is an `EC`, then we assume it is symmetrical, since it is impossible to make
 an asymmetrical `EC` without directly accessing its `.data` field, which is not
 a supported way of manipulating `EC`s.
 """
