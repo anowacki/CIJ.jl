@@ -17,27 +17,38 @@ end
     is_stable(C) -> ::Bool
 
 Return `false` if the input 6x6 matrix `C` is not positive definite (symmetric)
-and hence not dynamically stable.
-"""
-is_stable(C) = _is_posdef(C)
-is_stable(C::EC) = _is_posdef(C.data)
+and hence not dynamically stable, and `true` otherwise.
 
-function _is_posdef(a::AbstractMatrix)
+# Example
+```
+julia> c = CIJ.ol()[1]
+6×6 EC{Float64}:
+ 9.55291e7  2.02981e7  2.13413e7  0.0       0.0        0.0
+ 2.02981e7  5.85693e7  2.28912e7  0.0       0.0        0.0
+ 2.13413e7  2.28912e7  6.95976e7  0.0       0.0        0.0
+ 0.0        0.0        0.0        1.9076e7  0.0        0.0
+ 0.0        0.0        0.0        0.0       2.29508e7  0.0
+ 0.0        0.0        0.0        0.0       0.0        2.34575e7
+
+julia> is_stable(c)
+true
+
+julia> is_stable(EC(rand(6, 6)))
+false
+```
+"""
+is_stable(C) = _isposdef(C)
+
+# It's faster to convert to an Array and then use `isposdef`,
+# than it is to catch a PosDefException.
+_isposdef(c::StaticArray{Tuple{6,6}}) = LinearAlgebra.isposdef(Array(c))
+_isposdef(c::EC) = _isposdef(c.data)
+
+function _isposdef(a::AbstractMatrix)
     is_6x6(a) || throw(ArgumentError("matrix must be 6×6"))
     is_symm(a) || @warn("matrix not symmetrical: using upper half only")
     LinearAlgebra.isposdef(LinearAlgebra.Hermitian(a))
 end
-# Required since there is no working isposdef for StaticArrays
-_is_posdef(a::StaticMatrix) = try
-        LinearAlgebra.cholesky(a)
-        true
-    catch err
-        if err isa LinearAlgebra.PosDefException
-            false
-        else
-            rethrow(err)
-        end
-    end
 
 """
     is_symm(C) -> ::Bool
