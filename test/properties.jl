@@ -40,4 +40,16 @@ using LinearAlgebra: Symmetric
             end
         end
     end
+
+    @testset "Is 6×6" begin
+        @test CIJ.is_6x6(CIJ.ol()[1])
+        @test CIJ.is_6x6(rand(6, 6))
+        @test !CIJ.is_6x6(rand(5, 5))
+    end
+
+    @testset "Is symm" begin
+        @test CIJ.is_symm(CIJ.ol()[1])
+        @test CIJ.is_symm(Symmetric(rand(6, 6)))
+        @test !CIJ.is_symm((x = Array(CIJ.ol()[1]); x[1,2] = -x[1,2]; x))
+    end
 end
