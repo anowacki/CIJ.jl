@@ -4,6 +4,15 @@
     is_iso(C) -> ::Bool
 
 Return `true` if `C` is isotropic.
+
+# Examples
+```
+julia> is_iso(CIJ.iso(vp=8000, vs=4400))
+true
+
+julia> is_iso(CIJ.thom(8000, 4400, 0.01, 0.01, 0.01))
+false
+```
 """
 function is_iso(C; atol=eps(eltype(C)))
     all(x->isapprox(C[1,1], x, atol=atol), (C[2,2], C[3,3])) &&
@@ -19,7 +28,7 @@ end
 Return `false` if the input 6x6 matrix `C` is not positive definite (symmetric)
 and hence not dynamically stable, and `true` otherwise.
 
-# Example
+# Examples
 ```
 julia> c = CIJ.ol()[1]
 6×6 EC{Float64}:
