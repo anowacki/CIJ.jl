@@ -17,6 +17,9 @@ using CIJ, Test
             x = [10i + j for i in 1:6, j in 1:6]
             c = EC(x)
             @test c == [i<j ? 10i+j : 10j+i for i in 1:6, j in 1:6]
+            # Warning for asymmetric matrices
+            @test_logs (:warn, "input matrix not symmetrical: taking upper half"
+                ) EC((x = rand(6,6); x[1,2] = -x[1,2]; x), warn=true)
             # Tuple and array construction
             c′ = EC(((10i + j for j in 1:6 for i in 1:6)...,))
             @test c == c′
