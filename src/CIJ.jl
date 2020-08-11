@@ -80,6 +80,8 @@ include("util.jl")
 include("averaging.jl")
 include("effective_medium.jl")
 include("measures.jl")
+include("velocities.jl")
+include("io.jl")
 
 # Data
 include("sample_data.jl")
