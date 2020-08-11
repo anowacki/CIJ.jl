@@ -5,4 +5,5 @@ using Test
     include("synthesis.jl")
     include("properties.jl")
     include("conversion.jl")
+    include("velocities.jl")
 end
