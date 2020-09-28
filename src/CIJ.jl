@@ -10,10 +10,10 @@ Deal with linear elastic constants, especially for geophysical applications.
 """
 module CIJ
 
-import Dates.now
+using Dates: now
 import LinearAlgebra
-import LinearAlgebra: cross, dot, norm
-import Printf.@printf
+using LinearAlgebra: cross, dot, norm
+using Printf: @printf
 
 using StaticArrays
 using Rotations
