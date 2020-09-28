@@ -1,4 +1,4 @@
-# Copyright Andy Nowacki 2015-, all rights reserverd.
+# Copyright Andy Nowacki 2015-, all rights reserved.
 # See the file LICENSE.md for licence details.
 
 """
