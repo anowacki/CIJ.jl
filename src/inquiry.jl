@@ -50,6 +50,10 @@ is_stable(C) = _isposdef(C)
 
 # It's faster to convert to an Array and then use `isposdef`,
 # than it is to catch a PosDefException.
+# TODO: https://github.com/JuliaArrays/StaticArrays.jl/pull/886
+#       added `check` option to `cholesky` for `StaticArray`s, so when
+#       it is safe to require version 1.1.0 (released 28 March 2021), update
+#       this method to call `LinearAlgebra.isposdef(c)` instead.
 _isposdef(c::StaticArray{Tuple{6,6}}) = LinearAlgebra.isposdef(Array(c))
 _isposdef(c::EC) = _isposdef(c.data)
 
