@@ -34,7 +34,7 @@ import StaticArrays
 end
 
 @testset "Cij/Cijkl" begin
-    let vp = rand(), vs = 1.7*vp, ϵ = γ = δ = max(rand(), 0.01), (A, B, Γ) = 360 .* rand(3),
+    let vp = rand(), vs = vp/1.7, ϵ = γ = δ = max(rand(), 0.01), (A, B, Γ) = 360 .* rand(3),
             c = CIJ.rot3(CIJ.thom(vp, vs, ϵ, γ, δ), A, B, Γ), ca = Array(c)
         c4 = cijkl(c)
         @test c4 isa StaticArrays.MArray
