@@ -1,8 +1,7 @@
 # CIJ.jl
 
-[![Build Status](https://travis-ci.org/anowacki/CIJ.jl.svg?branch=master)](https://travis-ci.org/anowacki/CIJ.jl)
-[![Build status](https://ci.appveyor.com/api/projects/status/lki0bk4vrqvrh6qg?svg=true)](https://ci.appveyor.com/project/AndyNowacki/cij-jl)
-[![Coverage Status](https://coveralls.io/repos/github/anowacki/CIJ.jl/badge.svg?branch=master)](https://coveralls.io/github/anowacki/CIJ.jl?branch=master)
+[![Build Status](https://github.com/anowacki/CIJ.jl/workflows/CI/badge.svg)](https://github.com/anowacki/CIJ.jl/actions)
+[![codecov](https://codecov.io/gh/anowacki/CIJ.jl/branch/master/graph/badge.svg?token=9jiYUCivdO)](https://codecov.io/gh/anowacki/CIJ.jl)
 
 ## What is CIJ.jl?
 A [Julia](http://julialang.org) package for dealing with linear elastic
@@ -16,7 +15,7 @@ Julia install like so:
 ```julia
 julia> ] # Type ']' to enter pkg mode
 
-(v1.1) pkg> add https://github.com/anowacki/CIJ.jl
+(v1.6) pkg> add https://github.com/anowacki/CIJ.jl
 ```
 
 You then need only do
