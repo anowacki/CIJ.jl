@@ -67,7 +67,7 @@ datapath = joinpath(@__DIR__, "data")
             CIJ.write(io, CIJ.ol()...)
             lines = split(chomp(String(take!(io))), '\n')
             @test length(lines) == 23
-            @test occursin(r"# Saved by user .* on .* using CIJ.jl on Julia .*",
+            @test occursin(r"# Saved on .* using CIJ.jl on Julia .*",
                 lines[end])
         end
 

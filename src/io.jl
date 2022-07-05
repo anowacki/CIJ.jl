@@ -61,7 +61,7 @@ Write the density-normalised elastic constants `C` and density `rho` to the file
 If supplied, `comment` should be a string of one or more lines to write at the
 end of the output to describe the constants.  By default, the following is written:
 
-    # Saved by <user> on <hostname> on <date> using <Julia version>
+    # Saved on <date> using <Julia version>
 
 Such files usually have a `.ecs` file extension.
 """
@@ -89,9 +89,7 @@ function write(io::IO, C::EC, rho, comment=nothing)
         end
         Base.write(io, replace(chomp(comment), "\n"=>"\n# ") * "\n")
     elseif comment === nothing
-        user = ENV["USER"]
-        hostname = readchomp(`hostname`)
-        Base.write(io, "# Saved by user $user on $hostname on $(now()) using CIJ.jl on Julia $VERSION\n")
+        Base.write(io, "# Saved on $(now()) using CIJ.jl on Julia $VERSION\n")
     end
 
     nothing
