@@ -7,7 +7,8 @@
 - `CIJ.write` also now places the file name or `IO` object first,
   for consistency with `Base.write`.
 
-## New features
+## New features and non-breaking changes
+- Julia v1.6 is now the minimum required version.
 - `CIJ.read` and `CIJ.write` can now read/write from/to an `IO`
   object, like an `IOBuffer`.
 
