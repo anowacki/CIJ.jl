@@ -182,7 +182,7 @@ The formulation is according to Hudson (1982), as given in Crampin (1984).
 """
 function hudson(vp, vs, rho, del, ϵ, vpi, vsi, rhoi)
     # error("`hudson` has not been tested yet")
-    ϵ > 0.1 && warn("Theory of Hudson (1982) only valid for `ϵ` < 0.1, but using ϵ = $ϵ")
+    ϵ > 0.1 && @warn("Theory of Hudson (1982) only valid for `ϵ` < 0.1, but using ϵ = $ϵ")
     λ, μ, κ = lame(vp, vs, rho)
     λ′, μ′, κ′ = lame(vpi, vsi, rhoi)
     K = (κ′ + 4/3*μ′)/(π*del*μ) * (λ + 2μ)/(λ + μ)
