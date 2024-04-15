@@ -124,7 +124,7 @@ function make_T(C, x)
         n = ijkl[k,l]
         T[i,k] = T[i,k] + C[m,n]*x[j]*x[l]
     end
-    return LinearAlgebra.Hermitian(T) # Real-symmetric
+    return LinearAlgebra.Hermitian(SMatrix(T)) # Real-symmetric
 end
 
 "Return a 3-vector which is the cartesian direction corresponding to
