@@ -58,7 +58,10 @@ export
     # Operations
     rot3,
     symm,
-    symm!
+    symm!,
+    # Optional plotting
+    plot_sphere!,
+    plot_sphere
 
 "Lookup index matrix to convert between elasticity tensor and Voigt matrix"
 const VOIGT_CONTRACTION_MATRIX = @SMatrix [1 6 5
@@ -86,5 +89,8 @@ include("io.jl")
 
 # Data
 include("sample_data.jl")
+
+# Optional ploting
+include("plots.jl")
 
 end # module CIJ
