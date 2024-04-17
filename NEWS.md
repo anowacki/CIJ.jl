@@ -1,3 +1,12 @@
+# CIJ.jl v0.2.2 release notes
+
+## New features and non-breaking changes
+- `CIJ.plot_hemisphere` plots a 2D view of an upper hemisphere showing
+  phase velocities and fast orientations.
+- `CIJ.plot_hemisphere!` does the same, but plots into an existing
+  `Makie.PolarAxis`.
+
+
 # CIJ.jl v0.2.1 release notes
 
 ## New features and non-breaking changes

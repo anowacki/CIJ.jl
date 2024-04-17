@@ -10,6 +10,234 @@ include("TesselatedSphere.jl")
 import .TesselatedSphere as TS
 
 """
+    CIJ.plot_hemisphere(C, properties=(:vp, :avs); kwargs...) -> ::Makie.Figure
+
+Return a plot of phase velocities of a Voigt elasticity matrix `C`
+on an upper hemisphere.  One hemisphere is shown per entry in `properties`.
+
+`properties` is a set (e.g., vector or tuple) or `Symbol`s, of which each
+can be one of the following:
+
+- `:vp`: P-wave velocity
+- `:vs1`: Fast shear-wave velocity
+- `:vs2`: Slow shear-wave velocity
+- `:avs`: Shear-wave anisotropy (200⨯(Vₛ1 – Vₛ₂)/(Vₛ₁ + Vₛ₂) %)
+
+Velocities depend on the units of `C`; if `C` is normalised by density and
+hence in m²/s², then velocities are in m/s.  The default axis titles
+assume this is the case and if velocities are in, say, km/s, then
+you can pass a different argument to the `units` keyword argument.
+
+# Keyword arguments
+- `fast_dirs = (false, true)`: If this is a single `Bool`, then plot fast
+  shear-wave orientations on all axes.  If it is a set (e.g., vector or
+  tuple) of `Bool`s, then the `i`th `property` has fast S-wave orientations
+  shown if `fast_dirs[i]` is `true`.
+- `height = 300`: Default hemisphere height in pixels.  Set to `nothing`
+  to allow hemispheres to grow when resizing the figure.
+- `projection = :infinity`: Projection to use when plotting.  Can be one of:
+  - `:infinity`: Azimuthal projection at infinity; i.e., as if viewing a sphere
+    from infinite distance.
+  - `:lambert`: Lambert equal-area azimuthal projection.
+- `resize = true`: Resize the figure before returning to fit the plot.
+- `spacing = 2.5`: Spacing in ° for the grid sampling the hemisphere.
+- `units = "m/s"`: Assumed units of velocities when plotted.
+"""
+function CIJ.plot_hemisphere(
+    C,
+    properties=(:vp, :avs);
+    fast_dirs=(properties .== :avs),
+    height=300,
+    projection=:infinity,
+    resize::Bool=true,
+    spacing=2.5,
+    units="m/s",
+)
+    isempty(properties) && throw(ArgumentError("`properties` cannot be empty"))
+
+    all(in((:vp, :vs1, :vs2, :avs)), properties) ||
+        throw(ArgumentError(
+            "`properties` must be an iterable containing only: `:vp`, `:vs1`, `:vs2` or `:avs`"
+        ))
+
+    # Plot coordinates and phase velocities
+    (; θs, rs, values) = _phase_vels_and_hemisphere_coords(C, spacing; projection)
+
+    fig = Makie.Figure()
+
+    for (iprop, (property, fast)) in enumerate(zip(properties, Iterators.cycle(fast_dirs)))
+        label = _label_from_property(property, units)
+
+        icol = 2iprop - 1
+
+        ax = Makie.PolarAxis(
+            fig[1,icol];
+            direction=-1,
+            height=height,
+            width=height,
+            rgridvisible=false,
+            rlimits=(0, 1),
+            rticklabelsvisible=false,
+            thetagridvisible=false,
+            theta_0=-π/2,
+            thetaticks=([0, 3π/2], ["x₁", "x₂"]),
+            title=label,
+        )
+
+        plot_vals = getproperty.(values, property)
+
+        pl = Makie.contourf!(ax, θs, rs, plot_vals; colormap=Makie.Reverse(:turbo))
+
+        # Update title with P-wave anisotropy for P-wave plots
+        if property == :vp
+            vp_min, vp_max = extrema(plot_vals)
+            avp = 200*(vp_max - vp_min)/(vp_max + vp_min)
+            ax.title = label * " (AVₚ = $(round(avp; sigdigits=3)) %)"
+        end
+
+        Makie.tightlimits!(ax)
+
+        cb = Makie.Colorbar(fig[1,icol+1], pl;
+            height=(isnothing(height) ? nothing : 0.7*height),
+            tellheight=true,
+        )
+        
+        Makie.colgap!(fig.layout, icol, 2)
+
+        # Plot fast orientations
+        if fast
+            θs_fast, rs_fast, pols = _pols_and_hemisphere_coords(C, 2; projection)
+            Makie.scatter!(ax, θs_fast, rs_fast;
+                color=:black,
+                marker=:vline,
+                markersize=20,
+                rotations=(-deg2rad.(pols) .- θs_fast),
+                strokecolor=:white,
+                strokewidth=1,
+            )
+        end
+    end
+
+    resize && Makie.resize_to_layout!(fig)
+
+    fig
+end
+
+"""
+    CIJ.plot_hemisphere(C, property::Symbol; kwargs...) -> ::Makie.Figure
+
+Create a plot of a single `property`.
+"""
+CIJ.plot_hemisphere(C, properties::Symbol; kwargs...) =
+    CIJ.plot_hemisphere(C, (properties,); kwargs...)
+
+
+"""
+    CIJ.plot_hemisphere!(ax::Makie.PolarAxis, C, property::Symbol=:vp; fast_dirs=(property == :avs), projection=:infinity, spacing=2.5) -> ::Makie.Plot
+
+Plot a single upper hemisphere plot of phase velocities into an existing
+`Makie.PolarAxis` `ax` for a Voigt elastic constants matrix `C`.
+
+See [`plot_hemisphere`](@ref CIJ.plot_hemisphere) for more details,
+including keyword arguments.  Note that only those listed above can be used
+for this function.
+"""
+function CIJ.plot_hemisphere!(
+    ax::Makie.PolarAxis,
+    C,
+    property::Symbol=:vp;
+    fast_dirs=(property == :avs),
+    projection=:infinity,
+    spacing=2.5,
+)
+    (; θs, rs, values) = _phase_vels_and_hemisphere_coords(C, spacing; projection)
+    plot_vals = getproperty.(values, property)
+
+    pl = Makie.contourf!(ax, θs, rs, plot_vals; colormap=Makie.Reverse(:turbo))
+
+    # Plot fast orientations
+    if fast_dirs
+        θs_fast, rs_fast, pols = _pols_and_hemisphere_coords(C, 2; projection)
+        Makie.scatter!(ax, θs_fast, rs_fast;
+            color=:black,
+            marker=:vline,
+            markersize=20,
+            rotations=(-deg2rad.(pols) .- θs_fast),
+            strokecolor=:white,
+            strokewidth=1,
+        )
+    end
+
+    pl
+end
+
+"""
+    _phase_vels_and_hemisphere_coords(C, spacing; projection=:lambert) -> (; θs, rs, values)
+
+Calculate the output of `CIJ.phase_vels(C, azi, inc)` on an azimuth-inclination
+grid spaced `spacing`° apart.  These are returned in a named tuple as
+`:values`.  Also return the plotting coordinates `θs` and `rs`.
+`projection` is passed to [`_hemisphere_coords`](@ref).
+"""
+function _phase_vels_and_hemisphere_coords(C, spacing; projection=:lambert)
+    # Sampling points
+    azis = 0:spacing:360
+    incs = 0:spacing:90
+
+    # Matrix of phase velocities
+    values = CIJ.phase_vels.(Ref(C), azis, incs')
+
+    θs, rs = _hemisphere_coords(azis, incs; projection)
+
+    (; θs, rs, values)
+end
+
+"""
+    _pols_and_hemisphere_coords(C, level; projection=:lambert) -> θs, rs, pols
+
+Calculate the fast shear-wave polariations `pols` at a set of evenly distributed
+points about the upper hemisphere, defined by a tesselation of the sphere
+at `level`.  Returns these as well as the azimuths `θs` and radii `rs` at
+which to plot these points into a `Makie.PolarAxis`.  `projection` is
+passed on to [`_hemisphere_coords`](@ref).
+"""
+function _pols_and_hemisphere_coords(C, level; projection=:lambert)
+    t = TS.Tesselation(level)
+    incs, azis = _cart2incaz(filter!(p -> p.z >= 0, t.points))
+    pols = getproperty.(CIJ.phase_vels.(Ref(C), azis, incs), :pol)
+
+    θs, rs = _hemisphere_coords(azis, incs; projection)
+
+    θs, rs, pols
+end
+
+"""
+    _hemisphere_coords(azis, incs; projection=:lambert) -> θs, rs
+
+Calculate the polar plotting coordinates (azimuths `θs` and radii `rs`)
+for the azimuths `azis` and inclinations `incs` (both degrees) in
+the CIJ convention.  (See [`CIJ.phase_vels`](@ref).)
+
+`projection` defines the convention used.
+"""
+function _hemisphere_coords(azis, incs; projection=:lambert)
+    if projection == :lambert
+        θs = deg2rad.(azis)
+        # Maximum radius is √2, so we need to divide by √2 to get rs in the
+        # range [0, 1].  The formula has a 2 in front, so the prefactor becomes
+        # 2/√2 = √2
+        rs = √2 .* sind.((90 .- incs)./2)
+    elseif projection == :infinity
+        θs = deg2rad.(azis)
+        rs = sind.(90 .- incs)
+    else
+        throw(ArgumentError("unsupported projection '$projection'"))
+    end
+
+    θs, rs
+end    
+
+"""
     CIJ.plot_sphere(C::CIJ.ECs, property=:vp; kwargs...) -> figure, axis, plot
 
 Create a plot of the variation of `property` over all directions for the
@@ -22,7 +250,7 @@ be manipulated as usual Makie objects.
 - `:vp` (default): P-wave phase velocity
 - `:vs1`: Fast S-wave phase velocity
 - `:vs2`: Slow S-wave phase velocity
-- `:avs`: Shear wave anisotropy (200*(Vₛ₁ - Vₛ₂)/(Vₛ₁ + Vₛ₂) %)
+- `:avs`: Shear wave anisotropy (200⨯(Vₛ₁ – Vₛ₂)/(Vₛ₁ + Vₛ₂) %)
 
 Velocities depend on the units of `C`; if `C` is normalised by density and
 hence in m²/s², then velocities are in m/s.  The default colorbar label
@@ -64,17 +292,8 @@ function CIJ.plot_sphere(
     units="m/s",
     kwargs...
 )
-    label = if property == :vp
-        "Vₚ ($units)"
-    elseif property == :vs1
-        "Vₛ₁ ($units)"
-    elseif property == :vs2
-        "Vₛ₂ ($units)"
-    elseif property == :avs
-        "AVₛ (%)"
-    else
-        throw(ArgumentError("property must be one of :vp, :vs1, :vs2, :avs"))
-    end
+    # Throws if `property` is not something we can plot
+    label = _label_from_property(property, units)
 
     fig = Makie.Figure(; fig_kwargs...)
     ax = Makie.Axis3(
@@ -129,20 +348,20 @@ function CIJ.plot_sphere!(
     output = CIJ.phase_vels.(Ref(C), azis, incs)
 
     # Get property of interest
-    vals, color_limits = if property == :vp
-        getproperty.(output, :vp), extrema(x -> x.vp, output)
-    elseif property == :avs
-        getproperty.(output, :avs), (0, maximum(x -> x.avs, output))
-    elseif property == :vs1
-        getproperty.(output, :vs1), extrema(x -> x.vs1, output)
-    elseif property == :vs2
-        getproperty.(output, :vs2), extrema(x -> x.vs2, output)
+    vals, color_limits = if property == :avs
+        avs = getproperty.(output, :avs)
+        clims = (0, maximum(avs))
+        avs, clims
+    elseif property in (:vp, :vs1, :vs2)
+        vals_ = getproperty.(output, property)
+        clims = extrema(vals_)
+        vals_, clims
     else
         throw(ArgumentError("property must be one of :vp, :vs1, :vs2, :avs"))
     end
 
     # Plot surface
-    pl = Makie.mesh!(ax, mesh, color=vals, colormap=Makie.Reverse(:turbo), colorrange=color_limits)
+    pl = Makie.mesh!(ax, mesh; color=vals, colormap=Makie.Reverse(:turbo), colorrange=color_limits)
 
     # Fast orientations
     if fast_dirs || slow_dirs || p_dirs
@@ -201,6 +420,26 @@ and returns vectors of `azis` and `incs`.
 function _cart2incaz(rs::AbstractVector)
     inc_azs = CIJ.cart2incaz.(first.(rs), getindex.(rs, 2), last.(rs))
     first.(inc_azs), last.(inc_azs)
+end
+
+"""
+    _label_from_property(property::Symbol, units) -> label::String
+
+Return an appropriate label for the `property`, throwing an error
+if `property` is not something we can plot.
+"""
+function _label_from_property(property::Symbol, units)
+    label = if property == :vp
+        "Vₚ ($units)"
+    elseif property == :vs1
+        "Vₛ₁ ($units)"
+    elseif property == :vs2
+        "Vₛ₂ ($units)"
+    elseif property == :avs
+        "AVₛ (%)"
+    else
+        throw(ArgumentError("property must be one of :vp, :vs1, :vs2, :avs"))
+    end
 end
 
 """
