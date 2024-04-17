@@ -1,3 +1,17 @@
+# CIJ.jl v0.2.1 release notes
+
+## New features and non-breaking changes
+- `CIJ.phase_vels` now also returns particle motions for P, S1 and
+  S2.
+- `CIJ.phase_vels` no longer allocates at all and is faster.
+- If you load a backend for the [Makie.jl](https://docs.makie.org/stable/)
+  plotting package by doing e.g. `using GLMakie`, `using CairoMakie`,
+  `using WGLMakie`, etc., then you can plot phase velocities and
+  anisotropy using the new `CIJ.plot_sphere` function.
+  `CIJ.plot_sphere!` is also available to plot into an existing
+  `Makie.Axis3`.
+
+
 # CIJ.jl v0.2.0 release notes
 
 ## Breaking changes
