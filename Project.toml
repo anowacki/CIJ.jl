@@ -1,7 +1,7 @@
 name = "CIJ"
 uuid = "94ef64d9-0af0-5988-adf1-f968d20ebcf5"
 authors = ["Andy Nowacki <a.nowacki@leeds.ac.uk>"]
-version = "0.2.1"
+version = "0.2.2"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
