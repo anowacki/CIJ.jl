@@ -128,6 +128,35 @@ And the other way?
 c = CIJ.cijkl(C)
 ```
 
+## Plotting
+If you are using Julia v1.9 or later, and you have also loaded a
+backend from the [Makie.jl](https://docs.makie.org/stable/) ecosystem (e.g.,
+by doing `import GLMakie`, `import CairoMakie`, etc.), then you
+can create plots of phase velocity surfaces by calling one of the
+following functions:
+
+- `CIJ.plot_hemisphere` for a set of upper-hemisphere phase velocity
+  surfaces;
+- `CIJ.plot_hemisphere!` for a single surface into an existing `Makie.PolarAxis`;
+- `CIJ.plot_sphere` for a 3D view of the phase velocity surface; and
+- `CIJ.plot_sphere!` for a 3D view into an existing `Makie.Axis3`.
+
+For example:
+
+```julia
+julia> import GLMakie
+
+julia> CIJ.plot_hemisphere(CIJ.ol()[1])
+```
+
+![Upper hemisphere phase velocities of olivine](docs/images/olivine_upper_hemisphere.png)
+
+```julia
+julia> CIJ.plot_sphere(CIJ.ol()[1], :avs)
+```
+
+![3D spherical view of phase velocities of olivine](docs/images/olivine_sphere.jpg)
+
 ## Getting help
 Functions are documented, so at the REPL type `?` to get a `help?>` prompt,
 and type the name of the function:
