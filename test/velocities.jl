@@ -1,5 +1,10 @@
 using CIJ, Test
 
+function are_approx(a::Tuple, b::Tuple; atol=1e-6)
+    length(a) == length(b) || return false
+    all(≈(aa, bb; atol=atol) for (aa, bb) in zip(a, b))
+end
+
 @testset "Velocities" begin
     @testset "incaz2cart" begin
         @test CIJ.incaz2cart(0, 0) ≈ [1, 0, 0]
@@ -8,6 +13,13 @@ using CIJ, Test
         @test CIJ.incaz2cart(0, 45) ≈ [√2/2, -√2/2, 0]
         @test CIJ.incaz2cart(90, 0) ≈ [0, 0, 1]
         @test CIJ.incaz2cart(-45, 0) ≈ [√2/2, 0, -√2/2]
+    end
+
+    @testset "cart2incaz" begin
+        @test are_approx(CIJ.cart2incaz(1, 0, 0), (0, 0))
+        @test are_approx(CIJ.cart2incaz(0, 10, 0), (0, -90))
+        @test are_approx(CIJ.cart2incaz(0, 0, -100), (-90, 0))
+        @test are_approx(CIJ.cart2incaz(√2/2, √2/2, 1), (45, -45))
     end
 
     @testset "incaz2up" begin

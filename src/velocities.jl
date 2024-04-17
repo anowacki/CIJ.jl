@@ -127,11 +127,30 @@ function make_T(C, x)
     return LinearAlgebra.Hermitian(SMatrix(T)) # Real-symmetric
 end
 
-"Return a 3-vector which is the cartesian direction corresponding to
- the azimuth `az` and inclination `inc` (degrees)"
+"""
+    incaz2cart(inc, az) -> v
+
+Return a 3-vector `v` which is the cartesian direction corresponding to
+the azimuth `az` and inclination `inc` (degrees).
+"""
 function incaz2cart(inc, az)
     i = deg2rad(inc)
     a = deg2rad(az)
     cosi = cos(i)
     return @SVector [cos(a)*cosi, -sin(a)*cosi, sin(i)]
+end
+
+"""
+    cart2incaz(x, y, z) -> inc, az
+
+Return the inclination `inc` and azimuth `az` (both degrees) from
+the cartesian direction defined by the vector `[x, y, z]`.
+The vector need not be a unit vector as it is normalised inside
+this function.
+"""
+function cart2incaz(x, y, z)
+    x̂, ŷ, ẑ = (x, y, z)./hypot(x, y, z)
+    inc = asind(ẑ)
+    az = atand(-ŷ, x̂)
+    return inc, az
 end
