@@ -39,6 +39,7 @@ end
                     @test v.vs1 ≈ vs
                     @test v.vs2 ≈ vs
                     @test v.avs ≈ 0 atol=√eps()
+                    @test v.xp ≈ CIJ.incaz2cart(inc, azi)
                 end
             end
         end
@@ -54,6 +55,9 @@ end
                     @test v.vs2 ≈ vsv
                     @test v.pol ≈ 90 || v.pol ≈ -90
                     @test v.avs ≈ 200*(v.vs1 - v.vs2)/(v.vs1 + v.vs2)
+                    @test v.xp ≈ [1, 0, 0]
+                    @test v.xs1 ≈ [0, 1, 0] || v.xs1 ≈ [0, -1, 0]
+                    @test v.xs2 ≈ [0, 0, 1] || v.xs2 ≈ [0, 0, -1]
                 end
                 @testset "Horizontal x2" begin
                     v = CIJ.phase_vels(c, -90, 0)
@@ -62,6 +66,9 @@ end
                     @test v.vs2 ≈ vsv
                     @test v.pol ≈ 90 || v.pol ≈ -90
                     @test v.avs ≈ 200*(v.vs1 - v.vs2)/(v.vs1 + v.vs2)
+                    @test v.xp ≈ [0, 1, 0]
+                    @test v.xs1 ≈ [1, 0, 0] || v.xs1 ≈ [-1, 0, 0]
+                    @test v.xs2 ≈ [0, 0, 1] || v.xs2 ≈ [0, 0, -1]
                 end
                 @testset "Horizontal 45" begin
                     v = CIJ.phase_vels(c, -45, 0)
@@ -70,6 +77,9 @@ end
                     @test v.vs2 ≈ vsv
                     @test v.pol ≈ 90 || v.pol ≈ -90
                     @test v.avs ≈ 200*(v.vs1 - v.vs2)/(v.vs1 + v.vs2)
+                    @test v.xp ≈ [√2/2, √2/2, 0]
+                    @test v.xs1 ≈ [-√2/2, √2/2, 0] || v.xs1 ≈ [√2/2, -√2/2, 0]
+                    @test v.xs2 ≈ [0, 0, 1] || v.xs2 ≈ [0, 0, -1]
                 end
                 @testset "Vertical" begin
                     v = CIJ.phase_vels(c, 0, 90)
@@ -77,6 +87,7 @@ end
                     @test v.vs1 ≈ vsv
                     @test v.vs2 ≈ vsv
                     @test v.avs ≈ 0 atol=√eps()
+                    @test v.xp ≈ [0, 0, 1]
                 end
             end
         end
@@ -92,6 +103,9 @@ end
                     @test v.vs2 ≈ √c[5,5]
                     @test v.pol ≈ 90 || v.pol ≈ -90
                     @test v.avs ≈ 200*(v.vs1 - v.vs2)/(v.vs1 + v.vs2)
+                    @test v.xp ≈ [1, 0, 0]
+                    @test v.xs1 ≈ [0, 1, 0] || v.xs1 ≈ [0, -1, 0]
+                    @test v.xs2 ≈ [0, 0, 1] || v.xs2 ≈ [0, 0, -1]
                 end
 
                 # c2222 for P, c1212 and c2323 for S, or C66 and C44
@@ -102,6 +116,9 @@ end
                     @test v.vs2 ≈ √c[4,4]
                     @test v.pol ≈ 90 || v.pol ≈ -90
                     @test v.avs ≈ 200*(v.vs1 - v.vs2)/(v.vs1 + v.vs2)
+                    @test v.xp ≈ [0, 1, 0]
+                    @test v.xs1 ≈ [1, 0, 0] || v.xs1 ≈ [-1, 0, 0]
+                    @test v.xs2 ≈ [0, 0, 1] || v.xs2 ≈ [0, 0, -1]
                 end
 
                 # Compared to CIJ_phasevels from
@@ -113,6 +130,9 @@ end
                     @test v.vs2 ≈ 4625.1 atol=0.1
                     @test v.pol ≈ -32.7 atol=0.1
                     @test v.avs ≈ 14.8554 atol=0.0001
+                    @test v.xp ≈ [0.768, -0.308, 0.560] atol=0.01
+                    @test v.xs1 ≈ [0.634, 0.250, -0.731] atol=0.01
+                    @test v.xs2 ≈ [0.085, 0.917, 0.388] atol=0.01
                 end
             end
         end
