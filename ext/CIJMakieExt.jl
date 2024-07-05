@@ -41,6 +41,9 @@ you can pass a different argument to the `units` keyword argument.
   - `:lambert`: Lambert equal-area azimuthal projection.
 - `resize = true`: Resize the figure before returning to fit the plot.
 - `spacing = 2.5`: Spacing in ° for the grid sampling the hemisphere.
+- `ticks = (color=:black, markersize=20, strokecolor=:black, strokewidth=1)`:
+  `NamedTuple` or `Dict` containing keyword arguments passed to `Makie.scatter`
+  when plotting the fast orientations (if `fast_dirs` is `true`).
 - `units = "m/s"`: Assumed units of velocities when plotted.
 """
 function CIJ.plot_hemisphere(
@@ -51,6 +54,7 @@ function CIJ.plot_hemisphere(
     projection=:infinity,
     resize::Bool=true,
     spacing=2.5,
+    ticks=(),
     units="m/s",
 )
     isempty(properties) && throw(ArgumentError("`properties` cannot be empty"))
@@ -108,12 +112,13 @@ function CIJ.plot_hemisphere(
         if fast
             θs_fast, rs_fast, pols = _pols_and_hemisphere_coords(C, 2; projection)
             Makie.scatter!(ax, θs_fast, rs_fast;
+                rotations=(-deg2rad.(pols) .- θs_fast),
                 color=:black,
                 marker=:vline,
                 markersize=20,
-                rotations=(-deg2rad.(pols) .- θs_fast),
                 strokecolor=:white,
                 strokewidth=1,
+                ticks...
             )
         end
     end
@@ -133,7 +138,7 @@ CIJ.plot_hemisphere(C, properties::Symbol; kwargs...) =
 
 
 """
-    CIJ.plot_hemisphere!(ax::Makie.PolarAxis, C, property::Symbol=:vp; fast_dirs=(property == :avs), projection=:infinity, spacing=2.5) -> ::Makie.Plot
+    CIJ.plot_hemisphere!(ax::Makie.PolarAxis, C, property::Symbol=:vp; fast_dirs=(property == :avs), projection=:infinity, spacing=2.5, levels=10, ticks) -> ::Makie.Plot
 
 Plot a single upper hemisphere plot of phase velocities into an existing
 `Makie.PolarAxis` `ax` for a Voigt elastic constants matrix `C`.
@@ -141,30 +146,37 @@ Plot a single upper hemisphere plot of phase velocities into an existing
 See [`plot_hemisphere`](@ref CIJ.plot_hemisphere) for more details,
 including keyword arguments.  Note that only those listed above can be used
 for this function.
+
+The following additional keyword arguments are only applicable to this function:
+- `levels = 10`: `Int` containing the number of contours to plot, or a
+  `AbstractVector{<:Real}` giving the values of the contours to plot.
 """
 function CIJ.plot_hemisphere!(
     ax::Makie.PolarAxis,
     C,
     property::Symbol=:vp;
     fast_dirs=(property == :avs),
+    levels=10,
     projection=:infinity,
     spacing=2.5,
+    ticks=(),
 )
     (; θs, rs, values) = _phase_vels_and_hemisphere_coords(C, spacing; projection)
     plot_vals = getproperty.(values, property)
 
-    pl = Makie.contourf!(ax, θs, rs, plot_vals; colormap=Makie.Reverse(:turbo))
+    pl = Makie.contourf!(ax, θs, rs, plot_vals; colormap=Makie.Reverse(:turbo), levels)
 
     # Plot fast orientations
     if fast_dirs
         θs_fast, rs_fast, pols = _pols_and_hemisphere_coords(C, 2; projection)
         Makie.scatter!(ax, θs_fast, rs_fast;
+            rotations=(-deg2rad.(pols) .- θs_fast),
             color=:black,
             marker=:vline,
             markersize=20,
-            rotations=(-deg2rad.(pols) .- θs_fast),
             strokecolor=:white,
             strokewidth=1,
+            ticks...
         )
     end
 
