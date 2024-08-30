@@ -112,7 +112,7 @@ function CIJ.plot_hemisphere(
         if fast
             θs_fast, rs_fast, pols = _pols_and_hemisphere_coords(C, 2; projection)
             Makie.scatter!(ax, θs_fast, rs_fast;
-                rotations=(-deg2rad.(pols) .- θs_fast),
+                rotation=(-deg2rad.(pols) .- θs_fast),
                 color=:black,
                 marker=:vline,
                 markersize=20,
@@ -170,7 +170,7 @@ function CIJ.plot_hemisphere!(
     if fast_dirs
         θs_fast, rs_fast, pols = _pols_and_hemisphere_coords(C, 2; projection)
         Makie.scatter!(ax, θs_fast, rs_fast;
-            rotations=(-deg2rad.(pols) .- θs_fast),
+            rotation=(-deg2rad.(pols) .- θs_fast),
             color=:black,
             marker=:vline,
             markersize=20,
