@@ -47,3 +47,16 @@ To use this function, you must first load a backend for the
 have done this, the docstring will update.
 """
 function plot_hemisphere end
+
+"""
+    hemisphere_axis
+
+Return a `Makie.PolarAxis` into which upper hemisphere data can be plotted
+by passing azimuth and inclination.
+
+To use this function, you must first load a backend for the
+[Makie.jl](https://docs.makie.org/stable/) plotting package by doing e.g.
+`using GLMakie`, `using CairoMakie`, `using WGLMakie`, etc.  Once you
+have done this, the docstring will update.
+"""
+function hemisphere_axis end

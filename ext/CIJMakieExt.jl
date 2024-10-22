@@ -10,6 +10,28 @@ include("TesselatedSphere.jl")
 import .TesselatedSphere as TS
 
 """
+    hemisphere_axis(subfig; kwargs...) -> ::Makie.PolarAxis
+
+Return a `Makie.PolarAxis` which represents an upper hemisphere into
+which a call to `CIJ.plot_hemisphere!` can be made.
+
+`kwargs` are keyword arguments passed to the `Makie.PolarAxis`
+constructor.
+"""
+function CIJ.hemisphere_axis(subfig; kwargs...)
+    ax = Makie.PolarAxis(subfig;
+        direction=-1,
+        rgridvisible=false,
+        rlimits=(0, 1),
+        rticklabelsvisible=false,
+        thetagridvisible=false,
+        theta_0=-π/2,
+        thetaticks=([0, 3π/2], ["x₁", "x₂"]),
+        kwargs...
+    )
+end
+
+"""
     CIJ.plot_hemisphere(C, properties=(:vp, :avs); kwargs...) -> ::Makie.Figure
 
 Return a plot of phase velocities of a Voigt elasticity matrix `C`
@@ -74,19 +96,7 @@ function CIJ.plot_hemisphere(
 
         icol = 2iprop - 1
 
-        ax = Makie.PolarAxis(
-            fig[1,icol];
-            direction=-1,
-            height=height,
-            width=height,
-            rgridvisible=false,
-            rlimits=(0, 1),
-            rticklabelsvisible=false,
-            thetagridvisible=false,
-            theta_0=-π/2,
-            thetaticks=([0, 3π/2], ["x₁", "x₂"]),
-            title=label,
-        )
+        ax = CIJ.hemisphere_axis(fig[1,icol]; height=height, width=height, title=label)
 
         plot_vals = getproperty.(values, property)
 
@@ -278,8 +288,8 @@ you can pass a different argument to the `units` keyword argument.
   to `Makie.Figure`.  (Cannot be passed to `plot_sphere!`.)
 - `colorbar = true`: Whether (default) or not to show a colour scale on the
   right of the plot.  (Cannot be passed to `plot_sphere!`.)
-- `directions = ()`: Tuple of two things: (1) vector of directions and (2)
-  text to plot at each of these directions.
+- `directions = ()`: Tuple of two things: (1) vector of directions
+  as tuples (azi°, inc°) and (2) text to plot at each of these directions.
 - `fast_dirs`: Whether or not to plot ticks showing the orientation of the
   fast shear wave across the sphere.  Defaults to `true` unless plotting
   Vₚ.
@@ -348,6 +358,7 @@ function CIJ.plot_sphere!(
     p_dirs::Bool=false,
     p_normals::Bool=false,
     level=4,
+    directions=([], [])
 )
     # Create even sampling of the sphere
     t = TS.Tesselation(level)
@@ -413,12 +424,42 @@ function CIJ.plot_sphere!(
 
     # Primary directions
     Makie.arrows!(
+        ax,
         fill(Makie.Point(0, 0, 0), 3),
         [Makie.Vec3(1.1.*v...) for v in ((1, 0, 0), (0, 1, 0), (0, 0, 1))];
         arrowsize=Makie.Vec3(0.15, 0.15, 0.2),
         color=:white
     )
-    Makie.text!([1.2, 0, 0], [0, 1.2, 0], [0.1, 0.1, 1.2], text=["x₁", "x₂", "x₃"])
+    arrow_text_coords = ([1.2, 0, 0], [0, 1.2, 0], [0.1, 0.1, 1.2])
+    Makie.text!(ax, arrow_text_coords...; text=["█▌", "█▌", "█▌"], align=(:center, :bottom), color=:white)
+    Makie.text!(ax, arrow_text_coords...; text=["x₁", "x₂", "x₃"], align=(:center, :bottom))
+
+    # Annotations at certain directions
+    if !isempty(directions)
+        ndirections = length(directions[1])
+        if length(directions[2]) != ndirections
+            throw(ArgumentError(
+                "directions must contain a tuple of two vectors of the same length"
+            ))
+        end
+
+        direction_vectors = map(directions[1]) do (azi, inc)
+            Makie.Vec3((1.1 .* CIJ.incaz2cart(inc, azi))...)
+        end
+        text_positions = map(directions[1]) do (azi, inc)
+            Makie.Point((1.2 .* CIJ.incaz2cart(inc, azi))...)
+        end
+
+        Makie.arrows!(
+            ax,
+            fill(Makie.Point(0, 0, 0), ndirections),
+            direction_vectors;
+            arrowsize=Makie.Vec3(0.1, 0.1, 0.13),
+            color=:white
+        )
+        Makie.text!(ax, text_positions; text=fill("█", length(direction_vectors)), color=:white)
+        Makie.text!(ax, text_positions; text=directions[2])
+    end
 
     return pl
 end

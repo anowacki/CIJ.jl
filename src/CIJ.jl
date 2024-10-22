@@ -60,6 +60,7 @@ export
     symm,
     symm!,
     # Optional plotting
+    hemisphere_axis,
     plot_hemisphere!,
     plot_hemisphere,
     plot_sphere!,
