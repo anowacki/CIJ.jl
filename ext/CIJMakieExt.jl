@@ -312,7 +312,7 @@ function CIJ.plot_sphere(
         fig[1,1];
         aspect=:data,
         viewmode=:fit,
-        limits=0.8.*(-1, 1, -1, 1, -1, 1),
+        limits=1.5.*(-1, 1, -1, 1, -1, 1),
         elevation=π/6,
         azimuth=π/4,
         ax_kwargs...
