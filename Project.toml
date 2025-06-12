@@ -20,7 +20,7 @@ CIJMakieExt = ["GeometryBasics", "Makie"]
 
 [compat]
 GeometryBasics = "0.4, 0.5"
-Makie = "0.21, 0.22"
+Makie = "0.21, 0.22, 0.23"
 Rotations = "1"
 StaticArrays = "0.12, 1"
 julia = "1.6"
