@@ -40,13 +40,29 @@ end
     vti(; vpv, vsv, vph, vsh, eta)
 
 Return a density-normalised elastic tensor for a VTI medium defined using the velocities
-Vpv, Vsv, Vph, Vsh and anisotropy parameter η.
+Vpv, Vsv, Vph, Vsh and anisotropy parameter η, whereby
 
+- Vpv is the P-wave velocity parallel to the symmetry axis
+- Vsv is the S-wave velocity parallel to the symmetry axis
+- Vph is the P-wave velocity perpendicular to the symmetry axis
+- Vsh is the S-wave velocity for a horizontally-polarised shear wave perpendicular
+  to the symmetry axis
+- η describes how the velocities vary with angle from the symmetry axis
+  and is C₁₃/(C₁₁ - 2C₄₄)
+
+The constants are symmetric about the 3-axis
+
+---
     vti(; A, C, L, N, F)
 
-Return an unnormalised elastic tensor for a VTI medium defined using Love's (1927) notation.
+Return an unnormalised elastic tensor for a VTI medium defined using Love's (1927) notation,
+whereby
 
-The constants are symmetric about the 3-axis.
+- A is C₁₁, or ρ⋅Vph²
+- C is C₃₃, or ρ⋅Vpv²
+- L is C₄₄, or ρ⋅Vsv²
+- N is C₆₆, or ρ⋅Vsh²
+- F is C₁₃
 
 ### References
 
