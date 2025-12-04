@@ -7,4 +7,5 @@ using Test
     include("conversion.jl")
     include("velocities.jl")
     include("io.jl")
+    include("decompose.jl")
 end

@@ -13,7 +13,7 @@ module CIJ
 using Dates: now
 using DelimitedFiles: readdlm
 import LinearAlgebra
-using LinearAlgebra: cross, dot, norm
+using LinearAlgebra: ×, cross, dot, eigen, norm, normalize
 using Printf: @printf
 
 using StaticArrays
@@ -59,6 +59,8 @@ export
     rot3,
     symm,
     symm!,
+    # Tensor decomposition
+    decompose,
     # Optional plotting
     hemisphere_axis,
     plot_hemisphere!,
@@ -88,6 +90,8 @@ include("averaging.jl")
 include("effective_medium.jl")
 include("measures.jl")
 include("velocities.jl")
+include("decomposition.jl")
+include("symmetry.jl")
 include("io.jl")
 
 # Data
