@@ -180,7 +180,7 @@ function CIJ.plot_hemisphere!(
     if fast_dirs
         θs_fast, rs_fast, pols = _pols_and_hemisphere_coords(C, 2; projection)
         Makie.scatter!(ax, θs_fast, rs_fast;
-            rotations=(-deg2rad.(pols) .- θs_fast),
+            rotation=(-deg2rad.(pols) .- θs_fast),
             color=:black,
             marker=:vline,
             markersize=20,
@@ -322,7 +322,7 @@ function CIJ.plot_sphere(
         fig[1,1];
         aspect=:data,
         viewmode=:fit,
-        limits=1.2.*(-1, 1, -1, 1, -1, 1),
+        limits=1.5.*(-1, 1, -1, 1, -1, 1),
         elevation=π/6,
         azimuth=π/4,
         ax_kwargs...
@@ -527,14 +527,20 @@ segment is centred around `points` but has two ends either side, and its
 orientation is determined by `vectors`.
 """
 function _vector_lines(vectors, points; point_scale=1.01, vector_scale=0.1)
-    T = eltype(first(vectors))
-    nan = T(NaN)
+    # Work around https://github.com/MakieOrg/Makie.jl/issues/5298
+    # and avoid creating a `Vector{Makie.Point3}`, since `Point3` is a
+    # `UnionAll` and not a concrete type, and at present Makie can't
+    # convert that automatically for plotting.
+    V = eltype(first(vectors))
+    P = eltype(first(vectors))
+    T = promote_type(V, P, typeof(point_scale), typeof(vector_scale))
     # TODO: Replace with a version using `GeometryBasics.LineString`s?
     Iterators.flatten(
         (
             point_scale*p + vector_scale*x,
             point_scale*p - vector_scale*x,
-            GeometryBasics.Point3(nan, nan, nan)
+            # Avoid creating a UnionAll
+            GeometryBasics.Point3{T}(NaN32, NaN32, NaN32)
         )
         for (x, p) in zip(vectors, points)
     ) |> collect
