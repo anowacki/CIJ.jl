@@ -43,7 +43,7 @@ can be one of the following:
 - `:vp`: P-wave velocity
 - `:vs1`: Fast shear-wave velocity
 - `:vs2`: Slow shear-wave velocity
-- `:avs`: Shear-wave anisotropy (200⨯(Vₛ1 – Vₛ₂)/(Vₛ₁ + Vₛ₂) %)
+- `:avs`: Shear-wave anisotropy (200⨯(Vₛ₁ – Vₛ₂)/(Vₛ₁ + Vₛ₂) %)
 
 Velocities depend on the units of `C`; if `C` is normalised by density and
 hence in m²/s², then velocities are in m/s.  The default axis titles
@@ -122,7 +122,7 @@ function CIJ.plot_hemisphere(
         if fast
             θs_fast, rs_fast, pols = _pols_and_hemisphere_coords(C, 2; projection)
             Makie.scatter!(ax, θs_fast, rs_fast;
-                rotations=(-deg2rad.(pols) .- θs_fast),
+                rotation=(-deg2rad.(pols) .- θs_fast),
                 color=:black,
                 marker=:vline,
                 markersize=20,
@@ -322,7 +322,7 @@ function CIJ.plot_sphere(
         fig[1,1];
         aspect=:data,
         viewmode=:fit,
-        limits=0.8.*(-1, 1, -1, 1, -1, 1),
+        limits=1.2.*(-1, 1, -1, 1, -1, 1),
         elevation=π/6,
         azimuth=π/4,
         ax_kwargs...
@@ -423,11 +423,14 @@ function CIJ.plot_sphere!(
     end
 
     # Primary directions
-    Makie.arrows!(
+    Makie.arrows3d!(
         ax,
         fill(Makie.Point(0, 0, 0), 3),
         [Makie.Vec3(1.1.*v...) for v in ((1, 0, 0), (0, 1, 0), (0, 0, 1))];
-        arrowsize=Makie.Vec3(0.15, 0.15, 0.2),
+        taillength=0,
+        shaftradius=0,
+        tiplength=0.1,
+        tipradius=0.05,
         color=:white
     )
     arrow_text_coords = ([1.2, 0, 0], [0, 1.2, 0], [0.1, 0.1, 1.2])
@@ -435,7 +438,7 @@ function CIJ.plot_sphere!(
     Makie.text!(ax, arrow_text_coords...; text=["x₁", "x₂", "x₃"], align=(:center, :bottom))
 
     # Annotations at certain directions
-    if !isempty(directions)
+    if !isempty(first(directions))
         ndirections = length(directions[1])
         if length(directions[2]) != ndirections
             throw(ArgumentError(
@@ -450,11 +453,14 @@ function CIJ.plot_sphere!(
             Makie.Point((1.2 .* CIJ.incaz2cart(inc, azi))...)
         end
 
-        Makie.arrows!(
+        Makie.arrows3d!(
             ax,
             fill(Makie.Point(0, 0, 0), ndirections),
             direction_vectors;
-            arrowsize=Makie.Vec3(0.1, 0.1, 0.13),
+            taillength=0,
+            shaftradius=0,
+            tiplength=0.1,
+            tipradius=0.05,
             color=:white
         )
         Makie.text!(ax, text_positions; text=fill("█", length(direction_vectors)), color=:white)
@@ -521,12 +527,14 @@ segment is centred around `points` but has two ends either side, and its
 orientation is determined by `vectors`.
 """
 function _vector_lines(vectors, points; point_scale=1.01, vector_scale=0.1)
+    T = eltype(first(vectors))
+    nan = T(NaN)
     # TODO: Replace with a version using `GeometryBasics.LineString`s?
     Iterators.flatten(
         (
             point_scale*p + vector_scale*x,
             point_scale*p - vector_scale*x,
-            GeometryBasics.Point3(NaN32, NaN32, NaN32)
+            GeometryBasics.Point3(nan, nan, nan)
         )
         for (x, p) in zip(vectors, points)
     ) |> collect
