@@ -134,15 +134,19 @@ end
     thom_st(vp, vs, eps, gam, delst) -> C
 
 Return the 6x6 Voigt matrix `C` defined by the general anisotropy parameters of
-Thomsen (1986).
+Thomsen (1986), where `delst` is Thomsen's δ*.
 
 Output has same units as input.
+
+### References
+
+Thomsen, L. (1986).  Weak elastic anisotropy.  Geophysics, 51, 10, 1954-1966.
 """
 function thom_st(vp, vs, eps, gam, delst)
     if vp <= 0
-        error("CIJ.thom: vp must be greater than 0")
+        throw(ArgumentError("vp must be greater than 0"))
     elseif vs < 0
-        error("CIJ.thom: vs must be greater than or equal to 0")
+        throw(ArgumentError("vs must be greater than or equal to 0"))
     end
 
     C = zero(EC)
@@ -153,9 +157,9 @@ function thom_st(vp, vs, eps, gam, delst)
         C[6,6] = C[4,4]*(2*gam + 1)
         a = 2.0
         b = 4*C[4,4]
-        c = C[4,4]^2 - 2*delst*C[3,3]^2 - (C[3,3] - C[4,4])*(C[1,1] + C[3,3] - 2*C[4,4])
+        c = 2*C[4,4]^2 - 2*delst*C[3,3]^2 - (C[3,3] - C[4,4])*(C[1,1] + C[3,3] - 2*C[4,4])
         if b^2 - 4*a*c < 0
-            error("CIJ.thom_st: S velocity too high or delta too negative")
+            throw(ArgumentError("S velocity too high or delst too negative"))
         end
         C[1,3] = C[3,1] = C[2,3] = C[3,2] = (-b + sqrt(b^2 - 4*a*c))/(2*a)
         C[1,2] = C[2,1] = C[1,1] - 2C[6,6]
