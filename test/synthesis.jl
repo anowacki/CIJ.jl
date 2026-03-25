@@ -19,11 +19,21 @@ using CIJ, Test
         end
     end
 
+    @testset "thomsen_vti" begin
+        @testset "Invalid input" begin
+            @test_throws ArgumentError thomsen_vti(0, 1500, 0.1, 0.1, 0.1)
+            @test_throws ArgumentError thomsen_vti(1000, -1, 0.1, 0.1, 0.1)
+            @test_throws ArgumentError thomsen_vti(
+                4000, 2000, 0.1, 0.1, 0.1; delta_option=:incorrect_delta_option
+            )
+        end
+    end
+
     @testset "thom_st" begin
         @testset "Invalid input" begin
             @test_throws ArgumentError thom_st(0, 1000, 0, 0, 0)
             @test_throws ArgumentError thom_st(4000, -1000, 0, 0, 0)
-            @test_throws ArgumentError thom_st(4000, 2000, -1, 0, 0)
+            @test_throws ArgumentError thom_st(4000, 2000, -5, 0, 0)
         end
 
         @testset "Known values" begin
@@ -37,6 +47,9 @@ using CIJ, Test
             @test c[2,3] == c[1,3]
             @test c[1,4] == c[1,5] == c[1,6] == c[2,4] == c[2,5] == c[2,6] ==
                 c[3,4] == c[3,5] == c[3,6] == c[4,5] == c[4,6] == c[5,6] == 0
+
+            @test thom_st(4000, 2000, 0.01, -0.01, 0.03) ==
+                thomsen_vti(4000, 2000, 0.01, -0.01, 0.03; delta_option=:exact)
         end
     end
 end

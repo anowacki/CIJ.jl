@@ -127,8 +127,8 @@ function thomsen_vti(α, β, ϵ, γ, δ; delta_option=:weak_mensch)
         throw(ArgumentError("vs (β) must be greater than or equal to 0"))
     end
 
-    c33 = α^2
-    c44 = β^2
+    c33 = float(α)^2
+    c44 = float(β)^2
     c11 = (1 + 2*ϵ)*c33
     c66 = (1 + 2*γ)*c44
 
@@ -151,7 +151,7 @@ function thomsen_vti(α, β, ϵ, γ, δ; delta_option=:weak_mensch)
         end
         c13 = sqrt(sqrt_term) - c44
     else
-        throw(ArgumentError("unknown delta option: "*delta_option))
+        throw(ArgumentError("unknown delta option: ':$delta_option'"))
     end
 
     c12 = c11 - 2*c66
