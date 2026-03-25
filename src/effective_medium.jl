@@ -163,7 +163,7 @@ function tandon_and_weng(vp, vs, ρ, α, c, vpᵢ, vsᵢ, ρᵢ)
 
     # Apply density normalisation
     C = EC(C./ρ_out)
-    
+
     C, ρ_out
 end
 
@@ -207,7 +207,7 @@ function hudson(vp, vs, rho, del, ϵ, vpi, vsi, rhoi)
                                         0                  0                    0           0 X*U₃^2   0
                                         0                  0                    0           0   0    X*U₃^2]
     rho_bulk = (1 - ϵ)*rho + ϵ*rhoi
-    c = EC{DEFAULT_FLOAT}((c⁰ .+ c¹ .+ c²)./rho_bulk) 
+    c = EC{DEFAULT_FLOAT}((c⁰ .+ c¹ .+ c²)./rho_bulk)
     c, rho_bulk
 end
 
