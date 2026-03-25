@@ -33,6 +33,8 @@ export
     tandon_and_weng,
     thom,
     thom_st,
+    thomsen_cracks,
+    thomsen_fluid_factor,
     # Properties of a tensor
     Au,
     C2S,
