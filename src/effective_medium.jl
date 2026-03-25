@@ -163,7 +163,7 @@ function tandon_and_weng(vp, vs, ρ, α, c, vpᵢ, vsᵢ, ρᵢ)
 
     # Apply density normalisation
     C = EC(C./ρ_out)
-    
+
     C, ρ_out
 end
 
@@ -207,7 +207,7 @@ function hudson(vp, vs, rho, del, ϵ, vpi, vsi, rhoi)
                                         0                  0                    0           0 X*U₃^2   0
                                         0                  0                    0           0   0    X*U₃^2]
     rho_bulk = (1 - ϵ)*rho + ϵ*rhoi
-    c = EC{DEFAULT_FLOAT}((c⁰ .+ c¹ .+ c²)./rho_bulk) 
+    c = EC{DEFAULT_FLOAT}((c⁰ .+ c¹ .+ c²)./rho_bulk)
     c, rho_bulk
 end
 
@@ -259,3 +259,166 @@ grechka_cracks(C, ξ::AbstractVector, ϕ::AbstractVector=zeros(ξ, eltype(C))) =
     grechka_cracks!(deepcopy(C), ξ, ϕ)
 
 @doc (@doc grechka_cracks!) grechka_cracks
+
+"""
+    thomsen_cracks(vp, vs, flu_fac, frac_den; delta_option=:weak_mensch) -> C
+
+Create **density-normalised** elastic tensor for isotropic and porous rock
+containing a single fracture set using Thomsen's (1995) formulation
+assuming relatively low-frequency and low-porosity.  (Less restrictive equations
+are also provided by Thomsen but not implemeted here yet.)
+
+`vp` is the isotropic P-velocity of the porous host rock.
+
+`vs` is the isotropic S-velocity of the porous host rock.
+
+`flu_fac` is Thomsen's (1995) fluid factor parameter (Eq. 7a multiplied
+by 1 - ratio of pore fluid-to-solid bulk moduli).
+Value is confined to [0.0, 1.0]; weaker pore fluids correspond to larger
+`flu_fac` (e.g., gas ≈ 0.0).
+
+`frac_den` is the fracture density ``\\eta_c`` (Eq. 3), defined as
+```math
+    \\eta_c = N_v \\langle a^3 \\rangle / 8,
+```
+where ``N_v`` is the number density of fractures per unit volume and
+``\\langle a^3\\rangle`` is the mean cubed fracture radius.
+
+### Keyword arguments
+
+- `delta_option = :weak_mensch`: Method to calculate C₁₃ from Thomsen's δ or
+  δ* parameter, passed to [`thomsen_vti`](@ref).  See [`thomsen_vti`](@ref)
+  for details.
+
+### References
+
+- Thomsen, L. (1995). Elastic anisotropy due to aligned cracks in porous rock.
+  Geophysical Prospecting, 43(6), 805-829.
+"""
+function thomsen_cracks(vp, vs, flu_fac, frac_den; delta_option=:weak_mensch)
+    if !(0 <= flu_fac <= 1)
+        throw(ArgumentError("flu_fac must be in the range 0 to 1."))
+    end
+
+    # Define Thomsen's parameters
+    vp_vs_ratio = vp/vs
+    ν = 0.5/(1 - 1/vp_vs_ratio^2) - 1/(vp_vs_ratio^2 - 1)
+    ϵ = (8/3)*flu_fac*frac_den # Eq. 6a; Always positive!
+    γ = (8/3)*frac_den*(1 - ν)/(2 - ν) # Eq. 6b; Always positive! Note γ > ϵ for stiffer pore fluids and low aspect ratio
+    δ = 2*(1 - ν)*ϵ - 2*γ*(1 - 2*ν)/(1 - ν) # Eq. 6c; Can reasonably be ±
+    α = vp/sqrt(1 + 2*(((1 - ν)^2)/(1 - 2*ν))*ϵ)
+    β = vs/sqrt(1 + 2*γ)
+
+    thomsen_vti(vp, vs, ϵ, γ, δ; delta_option=delta_option)
+end
+
+"""
+    thomsen_cracks(vp, vs, density, porosity, frac_aspect_ratio, frac_density, Kf; delta_option=:weak_mensch) -> C
+
+Determine the density-normalised elastic constants using fracture density,
+aspect ratio and fluid bulk modulus rather than the fluid factor.
+
+`vp` is the isotropic P-velocity of the porous host rock.
+
+`vs` is the isotropic S-velocity of the porous host rock.
+
+`density` is the density of the porous host rock.
+
+`porosity` is the background porosity of the host rock.
+
+`frac_aspect_ratio` is the aspect ratio of the fractures (thickness/diameter).
+
+`frac_density` is the fracture density (see Eq. 3 for definition).
+
+`Kf` is the fluid bulk modulus (ρ_fluid*vp_fluid²)
+
+!!! note
+    The units of `vp`, `vs`, `density` and `Kf` must be consistent for `C` to
+    be meaningful; e.g. velocities should be in m/s, density should be in kg/m³,
+    and `Kf` should be in Pa.  No check is made on this.
+"""
+function thomsen_cracks(
+    vp, vs, density, porosity, frac_aspect_ratio, frac_density, Kf;
+    delta_option=:weak_mensch
+)
+    flu_fac = thomsen_fluid_factor(
+        vp, vs, density, porosity, frac_aspect_ratio, frac_density, Kf
+    )
+
+    thomsen_cracks(vp, vs, flu_fac, frac_density; delta_option=delta_option)
+end
+
+"""
+    thomsen_cracks(vp, vs, density, porosity, frac_aspect_ratio, frac_density, vp_fluid, density_fluid) -> C
+
+Determine constants using fluid P-wave velocity `vp_fluid` and density
+`density_fluid` rather than specifying bulk modulus directly.
+"""
+function thomsen_cracks(
+    vp, vs, density, porosity, frac_aspect_ratio, frac_density, vp_fluid, density_fluid;
+    delta_option=:weak_mensch
+)
+    Kf = density_fluid*vp_fluid^2
+    thomsen_cracks(
+        vp, vs, density, porosity, frac_aspect_ratio, frac_density, Kf;
+        delta_option=delta_option
+    )
+end
+
+"""
+    thomsen_fluid_factor(vp, vs, porosity, density, frac_aspect_ratio, frac_density, Kf)
+
+Compute fluid factor from Thomsen's (1995) theory of elasticity due to aligned
+fractures in a porous medium.
+
+`vp` is the isotropic P-velocity of the porous host rock.
+
+`vs` is the isotropic S-velocity of the porous host rock.
+
+`density` is the density of the porous host rock.
+
+`porosity` is the background porosity of the host rock.
+
+`frac_aspect_ratio` is the aspect ratio of the fractures (thickness/diameter).
+Values less than one describe flat 'pancake' fractures, while ratios bigger
+than 1 are for 'rugby ball'-shaped fractures.
+
+`frac_density` is the fracture density ``\\eta_c``, defined by Thomsen (1995)
+Eq. 3 as
+```math
+    \\eta_c = N_v \\langle a^3 \\rangle / 8,
+```
+where ``N_v`` is the number density of fractures per unit volume and
+``\\langle a^3\\rangle`` is the mean cubed fracture radius.
+
+`Kf` is the fluid bulk modulus (ρ_fluid*vp_fluid²).
+
+!!! note
+    The units of `vp`, `vs`, `density` and `Kf` must be consistent for `f` to
+    be meaningful; e.g. velocities should be in m/s, density should be in kg/m³,
+    and `Kf` should be in Pa.  No check is made on this.
+
+### References
+
+- Thomsen, L. (1995). Elastic anisotropy due to aligned cracks in porous rock.
+  Geophysical Prospecting, 43(6), 805-829.
+"""
+function thomsen_fluid_factor(
+    vp, vs, density, porosity, frac_aspect_ratio, frac_density, Kf
+)
+    # Derived elastic constants
+    Gs = density*vs^2 # Solid shear modulus
+    Ks = density*vp^2 - (4/3)*Gs # Solid bulk modulus
+    νs = (3*Ks - 2*Gs)/(6*Ks + 2*Gs) # Solid poisson ratio
+    frac_poro = (4/3)*pi*frac_aspect_ratio*frac_density # Fracture porosity
+
+    # Fluid-influence factor terms
+    Ac = (16/9)*(1 - νs^2)/(1 - 2*νs) # Eq. A13b
+    Ap = (3/2)*(1 - νs)/(1 - 2*νs) # Eq. A30b
+    Dcp = 1/(
+        1 - Kf/Ks
+        + (Kf/(Ks*(porosity + frac_poro)))*(Ap*porosity + Ac*frac_density)
+    ) # Eq. 7a
+
+    return (1 - Kf/Ks)*Dcp
+end

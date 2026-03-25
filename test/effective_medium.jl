@@ -20,4 +20,26 @@ using Test
             )
         end
     end
+
+    @testset "thomsen_cracks" begin
+        @testset "Invalid arguments" begin
+            @test_throws ArgumentError thomsen_cracks(4000, 2000, -0.1, 0.01)
+            @test_throws ArgumentError thomsen_cracks(4000, 2000, 1.1, 0.01)
+        end
+
+        @test all(
+            .≈(
+                thomsen_cracks(4850.0, 2770.0, 0.2, 0.06),
+                [
+                 2.50279e7  7.59037e6  7.20205e6  0.0       0.0       0.0
+                 7.59037e6  2.50279e7  7.20205e6  0.0       0.0       0.0
+                 7.20205e6  7.20205e6  2.35225e7  0.0       0.0       0.0
+                 0.0        0.0        0.0        7.6729e6  0.0       0.0
+                 0.0        0.0        0.0        0.0       7.6729e6  0.0
+                 0.0        0.0        0.0        0.0       0.0       8.71878e6
+                ],
+                atol=100
+            )
+        )
+    end
 end
