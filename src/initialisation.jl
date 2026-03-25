@@ -92,43 +92,97 @@ function vti(; vpv=nothing, vsv=nothing, vph=nothing, vsh=nothing, eta=nothing,
 end
 
 """
+    thomsen_vti(α, β, ϵ, γ, δ; delta_option=:weak_mensch) -> C::EC
+
+Returns density-normalised elastic constants from Thomsen's (1986)
+parameters for hexagonal symmetry.  `C` has rotational symmetry about the
+3-axis.
+
+`α`, `β`, `ϵ`, `γ`, `δ` are Thomsen's (1986) parameters:
+
+- `α`: P-wave velocity along the axis of symmetry, C₃₃
+- `β`: S-wave velocity along the axis of symmetry, C₄₄
+- `ϵ`: (C₁₁ - C₃₃)/2C₃₃
+- `γ`: (C₆₆ - C₄₄)/2c₄₄
+- `δ`: Determines how velocities change as a function of angle.  See `delta_option`
+  below.
+
+`delta_option` specifies which relationship to use in computing the
+elastic constant C₁₃ from Thomsen's δ or δ* parameter. Options are:
+- `:weak_thomsen`: Thomsen's (1986) weak anisotropy approximation (δ)
+- `:weak_mensch`: Mensch and Rasolofosaon's (1997) formulation for weak anisotropy
+  using a more accurate expansion
+- `:exact`: Thomsen's (1986) exact anisotropy equations (δ*)
+
+### References
+
+- Thomsen, L. (1986). Weak elastic anisotropy. Geophysics, 51(10), 1954-1966.
+- Mensch, T., & Rasolofosaon, P. (1997). Elastic-wave velocities in anisotropic media of arbitrary
+   symmetry—generalization of Thomsen's parameters ε, δ and γ. Geophysical Journal International, 128(1), 43-64.
+"""
+function thomsen_vti(α, β, ϵ, γ, δ; delta_option=:weak_mensch)
+    if α <= 0
+        throw(ArgumentError("vp (α) must be greater than 0"))
+    elseif β < 0
+        throw(ArgumentError("vs (β) must be greater than or equal to 0"))
+    end
+
+    c33 = α^2
+    c44 = β^2
+    c11 = (1 + 2*ϵ)*c33
+    c66 = (1 + 2*γ)*c44
+
+    # Weak formula (Eq. 17) to be used with Thomsen's weak anisotropy equations (Eq. 16)
+    if delta_option == :weak_thomsen
+        sqrt_term = 2*δ*c33*(c33 - c44) + (c33 - c44)^2
+        if sqrt_term < 0
+            throw(ArgumentError("S velocity too high or delta too negative"))
+        end
+        c13 = sqrt(sqrt_term) - c44
+    # Alternative (and generally more accurate) form from Mensch & Rasolofosaon
+    # (1997), Eqs. 20, δₓ
+    elseif delta_option == :weak_mensch
+        c13 = δ*c33 + c33 - 2*c44
+    # Exact formula (Eq. 8c) to be used with Thomsen's exact anisotropy equations (Eq. 10)
+    elseif delta_option == :exact
+        sqrt_term = δ*(c33^2) + (c33 - c44)*(c11 + c33 - 2*c44)/2
+        if sqrt_term < 0
+            throw(ArgumentError("S velocity too high or delta too negative"))
+        end
+        c13 = sqrt(sqrt_term) - c44
+    else
+        throw(ArgumentError("unknown delta option: "*delta_option))
+    end
+
+    c12 = c11 - 2*c66
+
+    EC((
+        c11, c12, c13,   0,   0,   0,
+        c12, c11, c13,   0,   0,   0,
+        c13, c13, c33,   0,   0,   0,
+          0,   0,   0, c44,   0,   0,
+          0,   0,   0,   0, c44,   0,
+          0,   0,   0,   0,   0, c66
+    ))
+end
+
+"""
     thom(vp, vs, eps, gam, del) -> C
 
-Return the 6x6 Voigt matrix defined `C` by the weak anisotropy parameters of
+Return the 6x6 Voigt matrix `C` defined by the weak anisotropy parameters of
 Thomsen (1986).
 
 Output is density-normalised tensor.
+
+!!! warning
+    `thom` is deprecated in favour of [`thomsen_vti`](@ref) and may be removed
+    in a future breaking release.
 
 ### References
 
 Thomsen, L. (1986).  Weak elastic anisotropy.  Geophysics, 51, 10, 1954-1966.
 """
-function thom(vp, vs, eps, gam, del)
-    if vp <= 0
-        error("CIJ.thom: vp must be greater than 0")
-    elseif vs < 0
-        error("CIJ.thom: vs must be greater than or equal to 0")
-    end
-
-    C = zero(EC)
-    @inbounds begin
-        C[3,3] = vp^2
-        C[1,1] = C[2,2] = C[3,3]*(2*eps + 1)
-        C[4,4] = C[5,5] = vs^2
-        C[6,6] = C[4,4]*(2*gam + 1)
-
-        b = 2C[4,4]
-        term = C[3,3] - C[4,4]
-        c = C[4,4]^2 - (2*del*C[3,3]*term + term^2)
-        d = b^2 - 4*c
-        if (d < 0)
-            error("CIJ.thom: S-velocity too high or delta too negative")
-        end
-        C[1,3] = C[2,3] = C[3,1] = C[3,2] = -b/2 + sqrt(d)/2
-        C[1,2] = C[2,1] = C[1,1] - 2*C[6,6]
-    end
-    return C
-end
+thom(vp, vs, eps, gam, del) = thomsen_vti(vp, vs, eps, gam, del; delta_option=:weak_thomsen)
 
 """
     thom_st(vp, vs, eps, gam, delst) -> C
@@ -138,34 +192,15 @@ Thomsen (1986), where `delst` is Thomsen's δ*.
 
 Output has same units as input.
 
+!!! warning
+    `thom_st` is deprecated in favour of [`thomsen_vti`](@ref) and may be removed
+    in a future breaking release.
+
 ### References
 
 Thomsen, L. (1986).  Weak elastic anisotropy.  Geophysics, 51, 10, 1954-1966.
 """
-function thom_st(vp, vs, eps, gam, delst)
-    if vp <= 0
-        throw(ArgumentError("vp must be greater than 0"))
-    elseif vs < 0
-        throw(ArgumentError("vs must be greater than or equal to 0"))
-    end
-
-    C = zero(EC)
-    @inbounds begin
-        C[3,3] = vp^2
-        C[1,1] = C[2,2] = C[3,3]*(2*eps + 1)
-        C[4,4] = C[5,5] = vs^2
-        C[6,6] = C[4,4]*(2*gam + 1)
-        a = 2.0
-        b = 4*C[4,4]
-        c = 2*C[4,4]^2 - 2*delst*C[3,3]^2 - (C[3,3] - C[4,4])*(C[1,1] + C[3,3] - 2*C[4,4])
-        if b^2 - 4*a*c < 0
-            throw(ArgumentError("S velocity too high or delst too negative"))
-        end
-        C[1,3] = C[3,1] = C[2,3] = C[3,2] = (-b + sqrt(b^2 - 4*a*c))/(2*a)
-        C[1,2] = C[2,1] = C[1,1] - 2C[6,6]
-    end
-    return C
-end
+thom_st(vp, vs, eps, gam, delst) = thomsen_vti(vp, vs, eps, gam, delst; delta_option=:exact)
 
 """
     global_VTI(vp, vs, xi, phi, eta) -> C

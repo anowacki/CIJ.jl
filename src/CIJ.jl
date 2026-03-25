@@ -35,6 +35,7 @@ export
     thom_st,
     thomsen_cracks,
     thomsen_fluid_factor,
+    thomsen_vti,
     # Properties of a tensor
     Au,
     C2S,
