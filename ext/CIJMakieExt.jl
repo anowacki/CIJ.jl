@@ -148,6 +148,34 @@ Create a plot of a single `property`.
 CIJ.plot_hemisphere(C, properties::Symbol; kwargs...) =
     CIJ.plot_hemisphere(C, (properties,); kwargs...)
 
+"""
+    CIJ.plot_hemisphere(gridposition, C[, property=:vp]; axis, kwargs...) -> axisplot::Makie.AxisPlot(axis, plot)
+
+Create a new upper hemisphere plot at `gridposition`, which is the
+position within a Makie layout.  Usually, this will be created by
+indexing into a `Makie.Figure` object (e.g., `fig[1,2]`).
+
+Keyword arguments in `axis` are passed to `CIJ.hemisphere_axis` when
+constructing the hemisphere axis object.  Other keyword arguments
+are as above.
+
+Returns a `Makie.AxisPlot` object containing the axis handle `axis`
+and plot object `plot`.
+
+`plot` can be passed to `Makie.Colorbar` to plot the property colour bar
+if needed (e.g., like `Makie.Colorbar(fig[1,3], plot)`).
+"""
+function CIJ.plot_hemisphere(
+    gridposition::Union{Makie.GridPosition,Makie.GridSubposition},
+    C,
+    property::Symbol=:vp;
+    axis=(height=300, width=300),
+    kwargs...
+)
+    ax = CIJ.hemisphere_axis(gridposition; axis...)
+    pl = CIJ.plot_hemisphere!(ax, C, property; kwargs...)
+    Makie.AxisPlot(ax, pl)
+end
 
 """
     CIJ.plot_hemisphere!(ax::Makie.PolarAxis, C, property::Symbol=:vp; fast_dirs=(property == :avs), projection=:infinity, spacing=2.5, levels=10, ticks) -> ::Makie.Plot
