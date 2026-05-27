@@ -51,6 +51,13 @@ assume this is the case and if velocities are in, say, km/s, then
 you can pass a different argument to the `units` keyword argument.
 
 # Keyword arguments
+- `observations = ([], [], [])`: A set of observations of shear-wave splitting
+  to plot on this hemisphere in addition to the properties requested.
+  Must be of the form `(azis, incs, pols)::NTuple{3,AbstractVector{<:Real}}}`,
+  i.e., a tuple of three vectors, respectively giving the azimuth, inclination
+  (°) and fast polarisation direction to plot as a set of bars (similarly to the
+  `fast_dirs` option).  Note that `pol` must be in the same convention as that
+  returned by [`CIJ.phase_vels`](@ref).
 - `fast_dirs = (false, true)`: If this is a single `Bool`, then plot fast
   shear-wave orientations on all axes.  If it is a set (e.g., vector or
   tuple) of `Bool`s, then the `i`th `property` has fast S-wave orientations
@@ -75,6 +82,7 @@ function CIJ.plot_hemisphere(
     properties=(:vp, :avs);
     fast_dirs=(properties .== :avs),
     height=300,
+    observations=nothing,
     projection=:infinity,
     resize::Bool=true,
     spacing=2.5,
@@ -133,6 +141,9 @@ function CIJ.plot_hemisphere(
                 ticks...
             )
         end
+
+        # 'Observations'
+        _plot_hemisphere_observations!(ax, observations, projection)
     end
 
     resize && Makie.resize_to_layout!(fig)
@@ -148,9 +159,37 @@ Create a plot of a single `property`.
 CIJ.plot_hemisphere(C, properties::Symbol; kwargs...) =
     CIJ.plot_hemisphere(C, (properties,); kwargs...)
 
+"""
+    CIJ.plot_hemisphere(gridposition, C[, property=:vp]; axis, kwargs...) -> axisplot::Makie.AxisPlot(axis, plot)
+
+Create a new upper hemisphere plot at `gridposition`, which is the
+position within a Makie layout.  Usually, this will be created by
+indexing into a `Makie.Figure` object (e.g., `fig[1,2]`).
+
+Keyword arguments in `axis` are passed to `CIJ.hemisphere_axis` when
+constructing the hemisphere axis object.  Other keyword arguments
+are as above.
+
+Returns a `Makie.AxisPlot` object containing the axis handle `axis`
+and plot object `plot`.
+
+`plot` can be passed to `Makie.Colorbar` to plot the property colour bar
+if needed (e.g., like `Makie.Colorbar(fig[1,3], plot)`).
+"""
+function CIJ.plot_hemisphere(
+    gridposition::Union{Makie.GridPosition,Makie.GridSubposition},
+    C,
+    property::Symbol=:vp;
+    axis=(height=300, width=300),
+    kwargs...
+)
+    ax = CIJ.hemisphere_axis(gridposition; axis...)
+    pl = CIJ.plot_hemisphere!(ax, C, property; kwargs...)
+    Makie.AxisPlot(ax, pl)
+end
 
 """
-    CIJ.plot_hemisphere!(ax::Makie.PolarAxis, C, property::Symbol=:vp; fast_dirs=(property == :avs), projection=:infinity, spacing=2.5, levels=10, ticks) -> ::Makie.Plot
+    CIJ.plot_hemisphere!(ax::Makie.PolarAxis, C, property::Symbol=:vp; fast_dirs=(property == :avs), observations=nothing, projection=:infinity, spacing=2.5, levels=10, ticks) -> ::Makie.Plot
 
 Plot a single upper hemisphere plot of phase velocities into an existing
 `Makie.PolarAxis` `ax` for a Voigt elastic constants matrix `C`.
@@ -169,6 +208,7 @@ function CIJ.plot_hemisphere!(
     property::Symbol=:vp;
     fast_dirs=(property == :avs),
     levels=10,
+    observations=nothing,
     projection=:infinity,
     spacing=2.5,
     ticks=(),
@@ -191,6 +231,9 @@ function CIJ.plot_hemisphere!(
             ticks...
         )
     end
+
+    # 'Observations'
+    _plot_hemisphere_observations!(ax, observations, projection)
 
     pl
 end
@@ -267,7 +310,36 @@ function _hemisphere_coords(azis, incs; projection=:lambert)
     end
 
     θs, rs
-end    
+end
+
+"""
+    _plot_hemisphere_observations!(ax, observations, projection) -> sc::Makie.Plot
+
+Plot a set of observations of fast polarisation orientations on an
+existing hemisphere axis.
+"""
+function _plot_hemisphere_observations!(ax, observations::Tuple, projection)
+    if length(observations) != 3
+        throw(ArgumentError("`observations` must be a tuple of azimuths, inclinations and fast orientations"))
+    else
+        azis_obs, incs_obs, pols_obs = observations
+        if length(azis_obs) != length(incs_obs) || length(incs_obs) != length(pols_obs)
+            throw(ArgumentError("all observation vectors must be the same length"))
+        end
+
+        θs_obs, rs_obs = _hemisphere_coords(azis_obs, incs_obs; projection)
+
+        Makie.scatter!(ax, θs_obs, rs_obs;
+            rotation=(-deg2rad.(pols_obs) .- θs_obs),
+            color=:white,
+            marker=:vline,
+            markersize=30,
+            strokecolor=:black,
+            strokewidth=2.,
+        )
+    end
+end
+_plot_hemisphere_observations!(ax, observations::Nothing, projection) = nothing
 
 """
     CIJ.plot_sphere(C::CIJ.ECs, property=:vp; kwargs...) -> figure, axis, plot
