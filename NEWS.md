@@ -1,3 +1,10 @@
+# CIJ.jl v0.2.3 releast notes
+
+## Notable bug fixes
+- `CIJ.grechka_cracks[!]` works again after previous changes caused
+  it to error when using `EC`s.
+
+
 # CIJ.jl v0.2.2 release notes
 
 ## New features and non-breaking changes

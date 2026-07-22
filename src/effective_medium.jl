@@ -234,17 +234,18 @@ N.B.: No check is made on the input constants `C`.
    characterization.  Geophysics, 72, D81–D91.  doi:10.1190/1.2751500
 """
 function grechka_cracks!(C, ξ, ϕ=zero(eltype(C)))
-    C .= CIJ.rot3(C, 0, 0, -ϕ)
+    C′ = CIJ.rot3(EC(C), 0, 0, -ϕ)
     # Excess normal and tangential compliances of crack
     Bn = 4/3*ξ*C[2,2]/C[6,6]/(C[2,2] - C[6,6])
     Bth = 16/3*ξ*C[2,2]/C[6,6]/(3C[2,2] - 2C[6,6])
     Btv = 16/3*ξ*C[3,3]/C[5,5]/(3C[3,3] - 2C[5,5])
     # Update compliance after Eschelby (1957)
-    S = C2S!(C)
-    S[2,2] += Bn
-    S[4,4] += Btv
-    S[6,6] += Bth
-    C .= CIJ.rot3(S2C!(S), 0, 0, ϕ)
+    S′ = C2S!(C′)
+    S′[2,2] += Bn
+    S′[4,4] += Btv
+    S′[6,6] += Bth
+    C″ = CIJ.rot3(S2C(S′), 0, 0, ϕ)
+    C .= C″.data
 end
 grechka_cracks(C, ξ, ϕ=zero(eltype(C))) = grechka_cracks!(deepcopy(C), ξ, ϕ)
 
