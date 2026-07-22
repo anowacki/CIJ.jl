@@ -18,6 +18,9 @@ by two periodic layers where each layer `i` is defined by:
 """
 function pitl(d1, vp1, vs1, rho1, d2, vp2, vs2, rho2)
     C = zero(EC)
+    d1, vp1, vs1, rho1, d2, vp2, vs2, rho2, _ = promote(
+        d1, vp1, vs1, rho1, d2, vp2, vs2, rho2, zero(eltype(C))
+    )
     # Lamé parameters from velocities
     m1 = rho1*vs1^2
     m2 = rho2*vs2^2
@@ -42,7 +45,7 @@ function pitl(d1, vp1, vs1, rho1, d2, vp2, vs2, rho2)
     end
     # Normalise back to average density
     rho = (d1*rho1 + d2*rho2)/(d1 + d2)
-    C ./= rho
+    C = EC(C./rho)
     return C, rho
 end
 
