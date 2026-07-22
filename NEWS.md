@@ -1,4 +1,11 @@
-# CIJ.jl v0.2.3 releast notes
+# CIJ.jl v0.2.4 release notes
+
+## Notable bug fixes
+- `CIJ.pitl` no longer suffers from problems when passing in literal
+  integers on 32-bit platforms.
+
+
+# CIJ.jl v0.2.3 release notes
 
 ## Notable bug fixes
 - `CIJ.grechka_cracks[!]` works again after previous changes caused
